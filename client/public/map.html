@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Live Map — Patrol-AI</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    #map { height: calc(100vh - 64px); width: 100%; background: #0d1520; }
+    .map-controls {
+      position: absolute; top: 80px; right: 24px; z-index: 1000;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .map-ctrl-btn {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-family: var(--font-display);
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .map-ctrl-btn:hover, .map-ctrl-btn.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
+    .leaflet-tile { filter: brightness(0.6) saturate(0.3) hue-rotate(190deg); }
+    .leaflet-container { background: #0d1520; }
+    .hotspot-marker { border-radius: 50%; border: 2px solid; opacity: 0.85; }
+  </style>
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon"><i class="fas fa-shield-halved"></i></div>
+        <div class="logo-text"><span class="logo-main">PATROL</span><span class="logo-ai">AI</span></div>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+    </div>
+    <nav class="nav-menu">
+      <a href="index.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+      <a href="map.html" class="nav-item active"><i class="fas fa-map-location-dot"></i><span>Live Map</span></a>
+      <a href="crimes.html" class="nav-item"><i class="fas fa-file-circle-exclamation"></i><span>Crime Reports</span></a>
+      <a href="officers.html" class="nav-item"><i class="fas fa-user-shield"></i><span>Officers</span></a>
+      <a href="patrols.html" class="nav-item"><i class="fas fa-route"></i><span>Patrol Routes</span></a>
+      <a href="analytics.html" class="nav-item"><i class="fas fa-brain"></i><span>AI Analytics</span></a>
+    </nav>
+    <div class="sidebar-footer"><div class="status-indicator"><span class="pulse-dot"></span><span>System Active</span></div></div>
+  </aside>
+
+  <main class="main-content" id="mainContent" style="padding:0;position:relative">
+    <header class="topbar" style="position:relative;z-index:500">
+      <div class="topbar-left">
+        <h1 class="page-title">Live Map</h1>
+        <span class="breadcrumb">Real-time / Crime Hotspot Visualization</span>
+      </div>
+      <div class="topbar-right">
+        <div class="datetime" id="datetime"></div>
+        <button class="btn-icon" onclick="refreshMap()"><i class="fas fa-sync-alt"></i></button>
+      </div>
+    </header>
+
+    <div id="map"></div>
+
+    <!-- Map Controls -->
+    <div class="map-controls">
+      <button class="map-ctrl-btn active" id="btnHotspots" onclick="toggleLayer('hotspots')">
+        <i class="fas fa-fire"></i> Hotspots
+      </button>
+      <button class="map-ctrl-btn active" id="btnCrimes" onclick="toggleLayer('crimes')">
+        <i class="fas fa-exclamation-circle"></i> Crimes
+      </button>
+      <button class="map-ctrl-btn active" id="btnPatrols" onclick="toggleLayer('patrols')">
+        <i class="fas fa-car-side"></i> Patrols
+      </button>
+    </div>
+
+    <!-- Legend -->
+    <div style="position:absolute;bottom:24px;right:24px;z-index:1000;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-size:11px">
+      <div style="font-family:var(--font-display);font-size:12px;color:var(--text-secondary);margin-bottom:8px;letter-spacing:1px">LEGEND</div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:50%;background:#ff4757"></div> Critical Risk</div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:50%;background:#ffa502"></div> High Risk</div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:50%;background:#00d4ff"></div> Medium Risk</div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:50%;background:#2ed573"></div> Low Risk</div>
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:12px;height:12px;border-radius:50%;background:#5352ed;border:2px solid #fff"></div> Officer</div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/map.js"></script>
+</body>
+</html>

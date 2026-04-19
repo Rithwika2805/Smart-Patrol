@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Patrol-AI | Intelligence-Driven Policing</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon"><i class="fas fa-shield-halved"></i></div>
+        <div class="logo-text"><span class="logo-main">PATROL</span><span class="logo-ai">AI</span></div>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+    </div>
+
+    <nav class="nav-menu">
+      <a href="index.html" class="nav-item active" data-tooltip="Dashboard">
+        <i class="fas fa-chart-line"></i><span>Dashboard</span>
+      </a>
+      <a href="map.html" class="nav-item" data-tooltip="Live Map">
+        <i class="fas fa-map-location-dot"></i><span>Live Map</span>
+      </a>
+      <a href="crimes.html" class="nav-item" data-tooltip="Crime Reports">
+        <i class="fas fa-file-circle-exclamation"></i><span>Crime Reports</span>
+      </a>
+      <a href="officers.html" class="nav-item" data-tooltip="Officers">
+        <i class="fas fa-user-shield"></i><span>Officers</span>
+      </a>
+      <a href="patrols.html" class="nav-item" data-tooltip="Patrol Routes">
+        <i class="fas fa-route"></i><span>Patrol Routes</span>
+      </a>
+      <a href="analytics.html" class="nav-item" data-tooltip="Analytics">
+        <i class="fas fa-brain"></i><span>AI Analytics</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="status-indicator">
+        <span class="pulse-dot"></span>
+        <span>System Active</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content" id="mainContent">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title">Command Dashboard</h1>
+        <span class="breadcrumb">Overview / Real-time Intelligence</span>
+      </div>
+      <div class="topbar-right">
+        <div class="datetime" id="datetime"></div>
+        <button class="btn-icon" onclick="refreshDashboard()"><i class="fas fa-sync-alt"></i></button>
+        <div class="alert-badge"><i class="fas fa-bell"></i><span id="alertCount">0</span></div>
+      </div>
+    </header>
+
+    <!-- Stats Row -->
+    <section class="stats-grid" id="statsGrid">
+      <div class="stat-card critical">
+        <div class="stat-icon"><i class="fas fa-triangle-exclamation"></i></div>
+        <div class="stat-info">
+          <span class="stat-label">Active Incidents</span>
+          <span class="stat-value" id="statOpenCases">--</span>
+          <span class="stat-change" id="statHighSev">-- critical</span>
+        </div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-icon"><i class="fas fa-user-shield"></i></div>
+        <div class="stat-info">
+          <span class="stat-label">Officers On Duty</span>
+          <span class="stat-value" id="statOnDuty">--</span>
+          <span class="stat-change" id="statAvailable">-- available</span>
+        </div>
+      </div>
+      <div class="stat-card warning">
+        <div class="stat-icon"><i class="fas fa-route"></i></div>
+        <div class="stat-info">
+          <span class="stat-label">Active Patrols</span>
+          <span class="stat-value" id="statActivePatrols">--</span>
+          <span class="stat-change" id="statScheduled">-- scheduled</span>
+        </div>
+      </div>
+      <div class="stat-card info">
+        <div class="stat-icon"><i class="fas fa-fire-flame-curved"></i></div>
+        <div class="stat-info">
+          <span class="stat-label">High-Risk Zones</span>
+          <span class="stat-value" id="statHighRisk">--</span>
+          <span class="stat-change">Requires attention</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Middle Section -->
+    <section class="mid-grid">
+      <!-- Crime Chart -->
+      <div class="card chart-card">
+        <div class="card-header">
+          <h3><i class="fas fa-chart-bar"></i> Crime by Type (Last 30 Days)</h3>
+          <div class="card-actions">
+            <select id="chartFilter" onchange="loadCrimeChart()">
+              <option value="type">By Type</option>
+              <option value="hour">By Hour</option>
+            </select>
+          </div>
+        </div>
+        <div class="card-body">
+          <canvas id="crimeChart" height="220"></canvas>
+        </div>
+      </div>
+
+      <!-- Hotspots List -->
+      <div class="card hotspots-card">
+        <div class="card-header">
+          <h3><i class="fas fa-fire"></i> Risk Hotspots</h3>
+          <a href="map.html" class="btn-link">View Map →</a>
+        </div>
+        <div class="card-body" id="hotspotsList">
+          <div class="loading-spinner"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bottom Section -->
+    <section class="bottom-grid">
+      <!-- AI Patrol Suggestions -->
+      <div class="card ai-card">
+        <div class="card-header">
+          <h3><i class="fas fa-brain"></i> AI Patrol Suggestions</h3>
+          <button class="btn-sm btn-primary" onclick="loadPatrolSuggestions()">
+            <i class="fas fa-magic-wand-sparkles"></i> Generate
+          </button>
+        </div>
+        <div class="card-body" id="patrolSuggestions">
+          <div class="empty-state">
+            <i class="fas fa-robot"></i>
+            <p>Click Generate for AI-powered patrol recommendations</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Crimes -->
+      <div class="card crimes-card">
+        <div class="card-header">
+          <h3><i class="fas fa-clock-rotate-left"></i> Recent Reports</h3>
+          <a href="crimes.html" class="btn-link">All Reports →</a>
+        </div>
+        <div class="card-body" id="recentCrimes">
+          <div class="loading-spinner"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

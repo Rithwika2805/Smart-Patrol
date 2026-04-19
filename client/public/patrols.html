@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Patrol Routes — Patrol-AI</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon"><i class="fas fa-shield-halved"></i></div>
+        <div class="logo-text"><span class="logo-main">PATROL</span><span class="logo-ai">AI</span></div>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+    </div>
+    <nav class="nav-menu">
+      <a href="index.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+      <a href="map.html" class="nav-item"><i class="fas fa-map-location-dot"></i><span>Live Map</span></a>
+      <a href="crimes.html" class="nav-item"><i class="fas fa-file-circle-exclamation"></i><span>Crime Reports</span></a>
+      <a href="officers.html" class="nav-item"><i class="fas fa-user-shield"></i><span>Officers</span></a>
+      <a href="patrols.html" class="nav-item active"><i class="fas fa-route"></i><span>Patrol Routes</span></a>
+      <a href="analytics.html" class="nav-item"><i class="fas fa-brain"></i><span>AI Analytics</span></a>
+    </nav>
+    <div class="sidebar-footer"><div class="status-indicator"><span class="pulse-dot"></span><span>System Active</span></div></div>
+  </aside>
+
+  <main class="main-content" id="mainContent">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title">Patrol Routes</h1>
+        <span class="breadcrumb">Deployment / Route Management</span>
+      </div>
+      <div class="topbar-right">
+        <div class="datetime" id="datetime"></div>
+        <button class="btn-sm btn-primary" onclick="openAssignModal()">
+          <i class="fas fa-plus"></i> Assign Patrol
+        </button>
+      </div>
+    </header>
+
+    <div class="filter-bar">
+      <select class="form-control" id="filterStatus" style="width:150px" onchange="loadPatrols()">
+        <option value="">All Status</option>
+        <option value="active">Active</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+      <input type="date" class="form-control" id="filterDate" style="width:160px" onchange="loadPatrols()"/>
+      <button class="btn-sm btn-secondary" onclick="loadActivePatrols()">
+        <i class="fas fa-satellite-dish"></i> Live View
+      </button>
+    </div>
+
+    <div style="padding:16px 24px">
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div id="patrolsTableWrap"><div class="loading-spinner"></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Assign Patrol Modal -->
+  <div class="modal-overlay" id="assignModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fas fa-route"></i> Assign Patrol Route</h3>
+        <button class="modal-close" onclick="closeAssignModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Officer *</label>
+          <select class="form-control" id="patrolOfficer">
+            <option value="">Select Available Officer</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Zones to Cover * (Hold Ctrl for multiple)</label>
+          <select class="form-control" id="patrolZones" multiple style="height:120px">
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group">
+            <label class="form-label">Start Time</label>
+            <input type="datetime-local" class="form-control" id="patrolStart"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">End Time</label>
+            <input type="datetime-local" class="form-control" id="patrolEnd"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <textarea class="form-control" id="patrolNotes" rows="2" placeholder="Special instructions..."></textarea>
+        </div>
+        <div id="routePreview" style="display:none;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:8px;font-size:12px">
+          <div style="color:var(--accent);font-family:var(--font-display);margin-bottom:6px">OPTIMIZED ROUTE PREVIEW</div>
+          <div id="routePreviewContent"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-sm btn-secondary" onclick="closeAssignModal()">Cancel</button>
+        <button class="btn-sm btn-primary" onclick="assignPatrol()"><i class="fas fa-check"></i> Assign Route</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Patrol Detail Modal -->
+  <div class="modal-overlay" id="patrolDetailModal">
+    <div class="modal" style="max-width:600px">
+      <div class="modal-header">
+        <h3><i class="fas fa-route"></i> Patrol Details</h3>
+        <button class="modal-close" onclick="document.getElementById('patrolDetailModal').classList.remove('active')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body" id="patrolDetailBody"></div>
+      <div class="modal-footer">
+        <button class="btn-sm btn-secondary" onclick="document.getElementById('patrolDetailModal').classList.remove('active')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/patrols.js"></script>
+</body>
+</html>

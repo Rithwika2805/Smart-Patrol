@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Analytics — Patrol-AI</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon"><i class="fas fa-shield-halved"></i></div>
+        <div class="logo-text"><span class="logo-main">PATROL</span><span class="logo-ai">AI</span></div>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+    </div>
+    <nav class="nav-menu">
+      <a href="index.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+      <a href="map.html" class="nav-item"><i class="fas fa-map-location-dot"></i><span>Live Map</span></a>
+      <a href="crimes.html" class="nav-item"><i class="fas fa-file-circle-exclamation"></i><span>Crime Reports</span></a>
+      <a href="officers.html" class="nav-item"><i class="fas fa-user-shield"></i><span>Officers</span></a>
+      <a href="patrols.html" class="nav-item"><i class="fas fa-route"></i><span>Patrol Routes</span></a>
+      <a href="analytics.html" class="nav-item active"><i class="fas fa-brain"></i><span>AI Analytics</span></a>
+    </nav>
+    <div class="sidebar-footer"><div class="status-indicator"><span class="pulse-dot"></span><span>System Active</span></div></div>
+  </aside>
+
+  <main class="main-content" id="mainContent">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title">AI Analytics</h1>
+        <span class="breadcrumb">Intelligence / Predictive Analysis</span>
+      </div>
+      <div class="topbar-right">
+        <div class="datetime" id="datetime"></div>
+      </div>
+    </header>
+
+    <!-- Risk Predictor -->
+    <div style="padding:24px 24px 0">
+      <div class="card">
+        <div class="card-header">
+          <h3><i class="fas fa-brain"></i> AI Risk Predictor</h3>
+          <span style="font-size:11px;color:var(--text-muted)">Predict crime risk for any zone at any time</span>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="margin:0;min-width:200px">
+              <label class="form-label">Zone</label>
+              <select class="form-control" id="predictZone"></select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Hour of Day</label>
+              <select class="form-control" id="predictHour" style="width:120px">
+                ${Array.from({length:24},(_,i)=>`<option value="${i}">${String(i).padStart(2,'0')}:00</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Day of Week</label>
+              <select class="form-control" id="predictDay" style="width:130px">
+                <option value="">Any Day</option>
+                <option value="1">Sunday</option><option value="2">Monday</option>
+                <option value="3">Tuesday</option><option value="4">Wednesday</option>
+                <option value="5">Thursday</option><option value="6">Friday</option>
+                <option value="7">Saturday</option>
+              </select>
+            </div>
+            <button class="btn-sm btn-primary" onclick="runPrediction()">
+              <i class="fas fa-bolt"></i> Predict Risk
+            </button>
+          </div>
+          <div id="predictionResult" style="margin-top:16px;display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="analytics-grid">
+      <!-- Crimes by Area -->
+      <div class="card">
+        <div class="card-header"><h3><i class="fas fa-map-pin"></i> Top Crime Areas</h3></div>
+        <div class="card-body"><canvas id="areaChart" height="250"></canvas></div>
+      </div>
+
+      <!-- Crime by Hour -->
+      <div class="card">
+        <div class="card-header"><h3><i class="fas fa-clock"></i> Crime by Hour of Day</h3></div>
+        <div class="card-body"><canvas id="hourChart" height="250"></canvas></div>
+      </div>
+
+      <!-- Patrol Coverage -->
+      <div class="card">
+        <div class="card-header"><h3><i class="fas fa-calendar-check"></i> 7-Day Patrol Coverage</h3></div>
+        <div class="card-body"><canvas id="coverageChart" height="250"></canvas></div>
+      </div>
+
+      <!-- Officer Performance -->
+      <div class="card">
+        <div class="card-header"><h3><i class="fas fa-medal"></i> Officer Performance</h3></div>
+        <div class="card-body" id="officerPerf" style="overflow-y:auto;max-height:270px"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/analytics.js"></script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Officers — Patrol-AI</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon"><i class="fas fa-shield-halved"></i></div>
+        <div class="logo-text"><span class="logo-main">PATROL</span><span class="logo-ai">AI</span></div>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+    </div>
+    <nav class="nav-menu">
+      <a href="index.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+      <a href="map.html" class="nav-item"><i class="fas fa-map-location-dot"></i><span>Live Map</span></a>
+      <a href="crimes.html" class="nav-item"><i class="fas fa-file-circle-exclamation"></i><span>Crime Reports</span></a>
+      <a href="officers.html" class="nav-item active"><i class="fas fa-user-shield"></i><span>Officers</span></a>
+      <a href="patrols.html" class="nav-item"><i class="fas fa-route"></i><span>Patrol Routes</span></a>
+      <a href="analytics.html" class="nav-item"><i class="fas fa-brain"></i><span>AI Analytics</span></a>
+    </nav>
+    <div class="sidebar-footer"><div class="status-indicator"><span class="pulse-dot"></span><span>System Active</span></div></div>
+  </aside>
+
+  <main class="main-content" id="mainContent">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title">Officer Management</h1>
+        <span class="breadcrumb">Personnel / Deployment</span>
+      </div>
+      <div class="topbar-right">
+        <div class="datetime" id="datetime"></div>
+        <button class="btn-sm btn-primary" onclick="openOfficerModal()">
+          <i class="fas fa-user-plus"></i> Add Officer
+        </button>
+      </div>
+    </header>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <select class="form-control" id="filterStatus" style="width:150px" onchange="loadOfficers()">
+        <option value="">All Status</option>
+        <option value="available">Available</option>
+        <option value="on_duty">On Duty</option>
+        <option value="off_duty">Off Duty</option>
+        <option value="leave">On Leave</option>
+      </select>
+      <select class="form-control" id="filterShift" style="width:140px" onchange="loadOfficers()">
+        <option value="">All Shifts</option>
+        <option value="morning">Morning</option>
+        <option value="evening">Evening</option>
+        <option value="night">Night</option>
+      </select>
+      <select class="form-control" id="filterDesignation" style="width:160px" onchange="loadOfficers()">
+        <option value="">All Designations</option>
+        <option>Constable</option><option>Head Constable</option>
+        <option>ASI</option><option>SI</option><option>Inspector</option>
+        <option>DSP</option><option>SP</option>
+      </select>
+
+      <!-- Summary pills -->
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center" id="officerSummary"></div>
+    </div>
+
+    <!-- Cards Grid -->
+    <div style="padding:24px">
+      <div id="officersGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">
+        <div class="loading-spinner" style="grid-column:1/-1"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add/Edit Officer Modal -->
+  <div class="modal-overlay" id="officerModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="officerModalTitle"><i class="fas fa-user-plus"></i> Add Officer</h3>
+        <button class="modal-close" onclick="closeOfficerModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="officerId"/>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group" style="grid-column:1/-1">
+            <label class="form-label">Full Name *</label>
+            <input type="text" class="form-control" id="officerName" placeholder="Officer full name"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Badge Number *</label>
+            <input type="text" class="form-control" id="officerBadge" placeholder="e.g. UP011"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Designation</label>
+            <select class="form-control" id="officerDesignation">
+              <option>Constable</option><option>Head Constable</option>
+              <option>ASI</option><option>SI</option><option>Inspector</option>
+              <option>DSP</option><option>SP</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Phone</label>
+            <input type="text" class="form-control" id="officerPhone" placeholder="Mobile number"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" id="officerEmail" placeholder="officer@uppolice.in"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Shift</label>
+            <select class="form-control" id="officerShift">
+              <option value="morning">Morning (6AM–2PM)</option>
+              <option value="evening">Evening (2PM–10PM)</option>
+              <option value="night">Night (10PM–6AM)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select class="form-control" id="officerStatus">
+              <option value="available">Available</option>
+              <option value="on_duty">On Duty</option>
+              <option value="off_duty">Off Duty</option>
+              <option value="leave">On Leave</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-sm btn-secondary" onclick="closeOfficerModal()">Cancel</button>
+        <button class="btn-sm btn-primary" onclick="saveOfficer()"><i class="fas fa-save"></i> Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/officers.js"></script>
+</body>
+</html>

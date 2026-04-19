@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Crime Reports — Patrol-AI</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon"><i class="fas fa-shield-halved"></i></div>
+        <div class="logo-text"><span class="logo-main">PATROL</span><span class="logo-ai">AI</span></div>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+    </div>
+    <nav class="nav-menu">
+      <a href="index.html" class="nav-item"><i class="fas fa-chart-line"></i><span>Dashboard</span></a>
+      <a href="map.html" class="nav-item"><i class="fas fa-map-location-dot"></i><span>Live Map</span></a>
+      <a href="crimes.html" class="nav-item active"><i class="fas fa-file-circle-exclamation"></i><span>Crime Reports</span></a>
+      <a href="officers.html" class="nav-item"><i class="fas fa-user-shield"></i><span>Officers</span></a>
+      <a href="patrols.html" class="nav-item"><i class="fas fa-route"></i><span>Patrol Routes</span></a>
+      <a href="analytics.html" class="nav-item"><i class="fas fa-brain"></i><span>AI Analytics</span></a>
+    </nav>
+    <div class="sidebar-footer"><div class="status-indicator"><span class="pulse-dot"></span><span>System Active</span></div></div>
+  </aside>
+
+  <main class="main-content" id="mainContent">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="page-title">Crime Reports</h1>
+        <span class="breadcrumb">Records / FIR Management</span>
+      </div>
+      <div class="topbar-right">
+        <div class="datetime" id="datetime"></div>
+        <button class="btn-sm btn-primary" onclick="openCrimeModal()">
+          <i class="fas fa-plus"></i> New Report
+        </button>
+      </div>
+    </header>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <select class="form-control" id="filterType" style="width:160px" onchange="loadCrimes()">
+        <option value="">All Types</option>
+        <option>Theft</option><option>Robbery</option><option>Assault</option>
+        <option>Burglary</option><option>Vandalism</option><option>Drug Offense</option>
+        <option>Fraud</option><option>Murder</option><option>Kidnapping</option>
+        <option>Eve Teasing</option><option>Domestic Violence</option><option>Other</option>
+      </select>
+      <select class="form-control" id="filterStatus" style="width:150px" onchange="loadCrimes()">
+        <option value="">All Status</option>
+        <option>open</option><option>investigating</option><option>resolved</option><option>closed</option>
+      </select>
+      <input type="date" class="form-control" id="filterStart" style="width:160px" onchange="loadCrimes()"/>
+      <input type="date" class="form-control" id="filterEnd" style="width:160px" onchange="loadCrimes()"/>
+      <button class="btn-sm btn-secondary" onclick="resetFilters()"><i class="fas fa-rotate-left"></i> Reset</button>
+      <span id="crimeCount" style="margin-left:auto;font-size:12px;color:var(--text-muted)"></span>
+    </div>
+
+    <!-- Table -->
+    <div style="padding:16px 24px">
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div id="crimesTableWrap">
+            <div class="loading-spinner"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Create/Edit Crime Modal -->
+  <div class="modal-overlay" id="crimeModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle"><i class="fas fa-file-circle-plus"></i> New Crime Report</h3>
+        <button class="modal-close" onclick="closeCrimeModal()"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="crimeId"/>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="form-group">
+            <label class="form-label">Crime Type *</label>
+            <select class="form-control" id="crimeType">
+              <option value="">Select Type</option>
+              <option>Theft</option><option>Robbery</option><option>Assault</option>
+              <option>Burglary</option><option>Vandalism</option><option>Drug Offense</option>
+              <option>Fraud</option><option>Murder</option><option>Kidnapping</option>
+              <option>Eve Teasing</option><option>Domestic Violence</option>
+              <option>Traffic Violation</option><option>Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Severity</label>
+            <select class="form-control" id="crimeSeverity">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Zone / Area *</label>
+            <select class="form-control" id="crimeArea">
+              <option value="">Select Zone</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select class="form-control" id="crimeStatus">
+              <option value="open">Open</option>
+              <option value="investigating">Investigating</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Date &amp; Time</label>
+            <input type="datetime-local" class="form-control" id="crimeOccurredAt"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Reported By</label>
+            <input type="text" class="form-control" id="crimeReportedBy" placeholder="Citizen / Officer name"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea class="form-control" id="crimeDesc" rows="3" placeholder="Describe the incident..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-sm btn-secondary" onclick="closeCrimeModal()">Cancel</button>
+        <button class="btn-sm btn-primary" onclick="saveCrime()"><i class="fas fa-save"></i> Save Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- View Crime Modal -->
+  <div class="modal-overlay" id="viewCrimeModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3><i class="fas fa-eye"></i> Crime Details</h3>
+        <button class="modal-close" onclick="document.getElementById('viewCrimeModal').classList.remove('active')"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body" id="viewCrimeBody"></div>
+      <div class="modal-footer">
+        <button class="btn-sm btn-secondary" onclick="document.getElementById('viewCrimeModal').classList.remove('active')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/crimes.js"></script>
+</body>
+</html>
