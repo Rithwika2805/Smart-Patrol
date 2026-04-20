@@ -30,7 +30,7 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Patrol-AI Server running on port ${PORT}`);
+  console.log(`Patrol-AI Server running on http://localhost:5000/index.html`);
 });
 
 module.exports = app;

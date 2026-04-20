@@ -203,12 +203,19 @@ async function updateHotspotRisk(areaId) {
     const [recent] = await db.query(
       `SELECT COUNT(*) as count, 
        SUM(CASE WHEN severity='high' THEN 3 WHEN severity='medium' THEN 2 ELSE 1 END) as weighted
-       FROM crimes WHERE area_id = ? AND occurred_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+       FROM crimes WHERE area_id = ? AND occurred_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)`,
       [areaId]
     );
 
     if (recent.length) {
-      const newScore = Math.min(100, (recent[0].weighted || 0) * 2);
+      // Get previous score
+      const [hotspot] = await db.query(`SELECT risk_score FROM hotspots WHERE id = ?`, [areaId]);
+
+      const previousScore = hotspot[0]?.risk_score || 50;
+      const weighted = recent[0].weighted || 0;
+
+      // Blend old + new (70% old, 30% new influence)
+      const newScore = Math.min(100, (previousScore * 0.7) + (weighted * 2));
       await db.query(`UPDATE hotspots SET risk_score = ?, updated_at = NOW() WHERE id = ?`, [newScore, areaId]);
     }
   } catch (err) {
