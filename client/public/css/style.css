@@ -1,43 +1,40 @@
-/* ============================================================
-   PATROL-AI — MAIN STYLESHEET
-   Dark tactical theme with cyan accent
-   ============================================================ */
-
 :root {
-  --bg-primary: #080c14;
-  --bg-secondary: #0d1520;
-  --bg-card: #101b28;
-  --bg-card-hover: #152230;
-  --border: #1e3045;
-  --border-light: #253d55;
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fef3e8;
 
-  --accent: #00d4ff;
-  --accent-dim: #0099bb;
-  --accent-glow: rgba(0, 212, 255, 0.15);
+  --border: #e5e7eb;
+  --border-light: #d1d5db;
 
-  --danger: #ff4757;
-  --danger-dim: rgba(255, 71, 87, 0.15);
-  --warning: #ffa502;
-  --warning-dim: rgba(255, 165, 2, 0.15);
-  --success: #2ed573;
-  --success-dim: rgba(46, 213, 115, 0.15);
-  --info: #5352ed;
-  --info-dim: rgba(83, 82, 237, 0.15);
+  --accent: #f97316;
+  --accent-dim: #ea580c;
+  --accent-glow: rgba(249, 115, 22, 0.12);
 
-  --text-primary: #e8f4fd;
-  --text-secondary: #7a9bb5;
-  --text-muted: #4a6a82;
+  --danger: #ef4444;
+  --danger-dim: rgba(239, 68, 68, 0.1);
+  --warning: #f59e0b;
+  --warning-dim: rgba(245, 158, 11, 0.1);
+  --success: #22c55e;
+  --success-dim: rgba(34, 197, 94, 0.1);
+  --info: #3b82f6;
+  --info-dim: rgba(59, 130, 246, 0.1);
+
+  --text-primary: #1f2933;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
 
   --sidebar-width: 220px;
   --sidebar-collapsed: 64px;
   --topbar-height: 64px;
 
-  --font-display: 'Rajdhani', sans-serif;
-  --font-body: 'Exo 2', sans-serif;
+  --font-display: 'Inter', sans-serif;
+  --font-body: 'Inter', sans-serif;
 
   --radius: 10px;
   --radius-sm: 6px;
-  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+
+  --shadow: 0 4px 12px rgba(0,0,0,0.06);
   --transition: 0.2s ease;
 }
 
