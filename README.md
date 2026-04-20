@@ -147,9 +147,3 @@ Open your browser and go to: **http://localhost:5000**
 
 The system uses single-user mode. No login required for demo.
 For production, add JWT authentication to `server/index.js`.
-
----
-
-## 📞 Support
-
-Built for Patrol-AI project. Timeline: 8–12 days.
