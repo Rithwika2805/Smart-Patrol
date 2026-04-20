@@ -1,7 +1,3 @@
-// ============================================================
-// PATROL-AI — Dashboard Logic
-// ============================================================
-
 let crimeChartInstance = null;
 
 async function loadDashboard() {

@@ -1,7 +1,3 @@
-// ============================================================
-// PATROL-AI — Officers Page
-// ============================================================
-
 async function loadOfficers() {
   const grid = document.getElementById('officersGrid');
   grid.innerHTML = '<div class="loading-spinner" style="grid-column:1/-1"></div>';

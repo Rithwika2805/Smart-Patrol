@@ -14,10 +14,10 @@ const pool = mysql.createPool({
 (async () => {
   try {
     const conn = await pool.getConnection();
-    console.log('✅ MySQL Connected');
+    console.log('MySQL Connected');
     conn.release();
   } catch (err) {
-    console.error('❌ MySQL Connection Error:', err.message);
+    console.error('MySQL Connection Error:', err.message);
   }
 })();
 

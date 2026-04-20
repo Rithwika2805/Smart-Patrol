@@ -1,7 +1,3 @@
-// ============================================================
-// PATROL-AI — Crimes Page
-// ============================================================
-
 async function loadCrimes() {
   const wrap = document.getElementById('crimesTableWrap');
   wrap.innerHTML = '<div class="loading-spinner"></div>';

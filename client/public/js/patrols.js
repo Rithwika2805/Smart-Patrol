@@ -1,7 +1,3 @@
-// ============================================================
-// PATROL-AI — Patrols Page
-// ============================================================
-
 async function loadPatrols() {
   const wrap = document.getElementById('patrolsTableWrap');
   wrap.innerHTML = '<div class="loading-spinner"></div>';

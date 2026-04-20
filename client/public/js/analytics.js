@@ -1,7 +1,3 @@
-// ============================================================
-// PATROL-AI — Analytics Page
-// ============================================================
-
 const chartOpts = (title) => ({
   responsive: true, maintainAspectRatio: false,
   plugins: { legend: { labels: { color: '#7a9bb5', font: { family: 'Exo 2', size: 11 } } } },

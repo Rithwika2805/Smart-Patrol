@@ -30,7 +30,7 @@ app.get('*', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚔 Patrol-AI Server running on port ${PORT}`);
+  console.log(`Patrol-AI Server running on port ${PORT}`);
 });
 
 module.exports = app;

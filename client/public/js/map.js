@@ -1,7 +1,3 @@
-// ============================================================
-// PATROL-AI — Live Map
-// ============================================================
-
 let map;
 const layers = { hotspots: null, crimes: null, patrols: null };
 const layerGroups = { hotspots: [], crimes: [], patrols: [] };
