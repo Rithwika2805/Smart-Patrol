@@ -9,7 +9,7 @@ const config = {
 
 async function seed() {
   const conn = await mysql.createConnection(config);
-  console.log('🌱 Seeding Patrol-AI database...');
+  console.log('Seeding Patrol-AI database...');
 
   try {
     // STATIONS
@@ -44,7 +44,7 @@ async function seed() {
       ('Dhoomanganj', 'Drug-related activity reports', 25.4150, 81.8650, 80, 'HIGH'),
       ('Teliarganj', 'Gang activity observed', 25.4250, 81.8200, 68, 'MEDIUM')
     `);
-    console.log('✅ Hotspots seeded');
+    console.log('Hotspots seeded');
 
     // OFFICERS
     await conn.query(`
@@ -60,7 +60,7 @@ async function seed() {
       ('Anjali Gupta', 'UP009', 'Constable', '9839012353', 'agupta@uppolice.in', 'morning', 'off_duty', 2),
       ('Vinod Chauhan', 'UP010', 'Inspector', '9839012354', 'vchauhan@uppolice.in', 'evening', 'available', 1)
     `);
-    console.log('✅ Officers seeded');
+    console.log('Officers seeded');
 
     // CRIMES (past 60 days)
     const crimeTypes = ['Theft', 'Robbery', 'Assault', 'Burglary', 'Vandalism', 'Drug Offense', 'Eve Teasing', 'Fraud'];
@@ -94,7 +94,7 @@ async function seed() {
         crime
       );
     }
-    console.log('✅ 80 Crimes seeded');
+    console.log('80 Crimes seeded');
 
     // PATROLS
     await conn.query(`
@@ -116,10 +116,10 @@ async function seed() {
       (3, 5, 25.3950, 81.8950, 1, 'pending'),
       (3, 8, 25.5200, 81.8750, 2, 'pending')
     `);
-    console.log('✅ Patrols seeded');
+    console.log('Patrols seeded');
 
-    console.log('\n🎉 Database seeded successfully!');
-    console.log('📊 Summary:');
+    console.log('\nDatabase seeded successfully!');
+    console.log('Summary:');
     console.log('   • 4 Police Stations');
     console.log('   • 10 Crime Hotspots');
     console.log('   • 10 Officers');
@@ -127,7 +127,7 @@ async function seed() {
     console.log('   • 4 Patrol Assignments');
 
   } catch (err) {
-    console.error('❌ Seed error:', err);
+    console.error('Seed error:', err);
   } finally {
     await conn.end();
   }

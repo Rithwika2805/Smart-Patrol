@@ -1,8 +1,3 @@
--- ============================================================
--- PATROL-AI DATABASE SCHEMA
--- Run this file in MySQL to set up the database
--- ============================================================
-
 CREATE DATABASE IF NOT EXISTS patrol;
 USE patrol;
 
