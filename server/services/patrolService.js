@@ -26,9 +26,14 @@ exports.generateSmartSuggestions = async () => {
   const workloadData = await officerService.getOfficerWorkload();
 
   // Sort officers by least workload
-  const officersByWorkload = workloadData
-    .filter(o => o.status === 'available')
-    .sort((a, b) => a.recent_patrols - b.recent_patrols);
+  const officersByWorkload = availableOfficers.map(o => {
+    const workload = workloadData.find(w => w.id === o.id);
+    return {
+      ...o,
+      recent_patrols: workload?.recent_patrols || 0
+    };
+  })
+  .sort((a, b) => a.recent_patrols - b.recent_patrols);
 
   // Generate suggestions - pair officers with hotspots
   const suggestions = [];
@@ -36,7 +41,7 @@ exports.generateSmartSuggestions = async () => {
 
   for (let i = 0; i < maxSuggestions; i++) {
     const hotspot = hotspots[i];
-    const officer = officersByWorkload[i] || availableOfficers[i];
+    const officer = officersByWorkload[i];
 
     if (!officer) continue;
 

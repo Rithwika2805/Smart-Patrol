@@ -201,23 +201,45 @@ exports.predictRisk = async (req, res) => {
 async function updateHotspotRisk(areaId) {
   try {
     const [recent] = await db.query(
-      `SELECT COUNT(*) as count, 
-       SUM(CASE WHEN severity='high' THEN 3 WHEN severity='medium' THEN 2 ELSE 1 END) as weighted
-       FROM crimes WHERE area_id = ? AND occurred_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)`,
+      `SELECT 
+         COUNT(*) as count, 
+         SUM(CASE 
+           WHEN severity='critical' THEN 4
+           WHEN severity='high' THEN 3 
+           WHEN severity='medium' THEN 2 
+           ELSE 1 
+         END) as weighted
+       FROM crimes 
+       WHERE area_id = ? 
+       AND occurred_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)`,
       [areaId]
     );
 
-    if (recent.length) {
-      // Get previous score
-      const [hotspot] = await db.query(`SELECT risk_score FROM hotspots WHERE id = ?`, [areaId]);
+    if (!recent.length) return;
 
-      const previousScore = hotspot[0]?.risk_score || 50;
-      const weighted = recent[0].weighted || 0;
+    const weighted = recent[0].weighted || 0;
 
-      // Blend old + new (70% old, 30% new influence)
-      const newScore = Math.min(100, (previousScore * 0.7) + (weighted * 2));
-      await db.query(`UPDATE hotspots SET risk_score = ?, updated_at = NOW() WHERE id = ?`, [newScore, areaId]);
-    }
+    // Normalize to 0–100 scale
+    const normalized = Math.min(100, weighted * 2);
+
+    const [hotspot] = await db.query(
+      `SELECT risk_score FROM hotspots WHERE id = ?`,
+      [areaId]
+    );
+
+    const previousScore = hotspot[0]?.risk_score ?? 0;
+
+    const newScore = Math.round(
+      (previousScore * 0.7) + (normalized * 0.3)
+    );
+
+    await db.query(
+      `UPDATE hotspots 
+       SET risk_score = ?, updated_at = NOW() 
+       WHERE id = ?`,
+      [newScore, areaId]
+    );
+
   } catch (err) {
     console.error('Error updating hotspot risk:', err);
   }
