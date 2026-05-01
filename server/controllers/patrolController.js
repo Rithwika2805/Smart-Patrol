@@ -1,6 +1,7 @@
 const db = require('../db');
 const patrolService = require('../services/patrolService');
 const routeService = require('../services/routeService');
+const officerService = require('../services/officerService');
 
 // GET all patrols
 exports.getAllPatrols = async (req, res) => {
@@ -48,14 +49,44 @@ exports.createPatrol = async (req, res) => {
   try {
     const { officer_id, area_ids, start_time, end_time, notes } = req.body;
 
+    const formatDateTime = (iso) => {
+      const d = new Date(iso);
+
+      const pad = (n) => n.toString().padStart(2, '0');
+
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+            `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    };
+
+    const formattedStart = formatDateTime(start_time);
+    const formattedEnd = formatDateTime(end_time);
+
     if (!officer_id || !area_ids?.length) {
       return res.status(400).json({ success: false, error: 'officer_id and area_ids required' });
     }
 
     // Verify officer is available
-    const [officer] = await db.query(`SELECT * FROM officers WHERE id = ? AND status = 'available'`, [officer_id]);
+    const [officer] = await db.query(
+      `SELECT * FROM officers WHERE id = ?`,
+      [officer_id]
+    );
+
     if (!officer.length) {
-      return res.status(400).json({ success: false, error: 'Officer not available' });
+      return res.status(400).json({ success: false, error: 'Officer not found' });
+    }
+
+    // 🧠 Check real availability using time slot
+    const isAvailable = await officerService.isOfficerAvailable(
+      officer_id,
+      formattedStart,
+      formattedEnd
+    );
+
+    if (!isAvailable) {
+      return res.status(400).json({
+        success: false,
+        error: 'Officer not available in this time slot'
+      });
     }
 
     // Generate optimized route
@@ -64,7 +95,7 @@ exports.createPatrol = async (req, res) => {
     const [result] = await db.query(
       `INSERT INTO patrols (officer_id, route_data, start_time, end_time, status, notes, created_at)
        VALUES (?, ?, ?, ?, 'scheduled', ?, NOW())`,
-      [officer_id, JSON.stringify(optimizedRoute), start_time, end_time, notes]
+      [officer_id, JSON.stringify(optimizedRoute), formattedStart, formattedEnd, notes]
     );
 
     // Insert waypoints
@@ -74,7 +105,7 @@ exports.createPatrol = async (req, res) => {
         await db.query(
           `INSERT INTO patrol_waypoints (patrol_id, area_id, lat, lng, sequence_order, estimated_arrival)
            VALUES (?, ?, ?, ?, ?, ?)`,
-          [result.insertId, wp.area_id, wp.lat, wp.lng, i + 1, wp.estimated_arrival]
+          [result.insertId, wp.area_id, wp.lat, wp.lng, i + 1, formatDateTime(wp.estimated_arrival)]
         );
       }
     }
@@ -87,6 +118,62 @@ exports.createPatrol = async (req, res) => {
       data: { id: result.insertId, route: optimizedRoute },
       message: 'Patrol assigned successfully'
     });
+  } catch (err) {
+    console.error("🔥🔥 CREATE PATROL ERROR FULL:", err);
+    console.error("🔥 STACK:", err.stack);
+
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      stack: err.stack
+    });
+  }
+};
+
+exports.updateWaypointStatus = async (req, res) => {
+  try {
+    const { waypoint_id } = req.params;
+    const { status } = req.body;
+
+    if (!['reached', 'skipped'].includes(status)) {
+      return res.status(400).json({ success: false, error: 'Invalid status' });
+    }
+
+    // 1️⃣ Get waypoint details
+    const [[wp]] = await db.query(
+      `SELECT patrol_id, lat, lng 
+       FROM patrol_waypoints 
+       WHERE id = ?`,
+      [waypoint_id]
+    );
+
+    if (!wp) {
+      return res.status(404).json({ success: false, error: 'Waypoint not found' });
+    }
+
+    // 2️⃣ Update waypoint status
+    await db.query(
+      `UPDATE patrol_waypoints 
+       SET status = ? 
+       WHERE id = ?`,
+      [status, waypoint_id]
+    );
+
+    // 3️⃣ If reached → update patrol location 🔥
+    if (status === 'reached') {
+      await db.query(
+        `UPDATE patrols 
+         SET current_lat = ?, current_lng = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [wp.lat, wp.lng, wp.patrol_id]
+      );
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Waypoint marked as ${status} and position updated`
+    });
+
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

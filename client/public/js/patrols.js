@@ -106,6 +106,7 @@ async function viewPatrol(id) {
   try {
     const res = await API.patrols.getById(id);
     const p = res.data;
+    document.getElementById('patrolDetailModal').setAttribute('data-id', id);
     const wps = p.waypoints || [];
 
     document.getElementById('patrolDetailBody').innerHTML = `
@@ -126,9 +127,23 @@ async function viewPatrol(id) {
               <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
                 <div style="width:24px;height:24px;background:${w.status==='reached'?'var(--success-dim)':'var(--border)'};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--font-display);color:${w.status==='reached'?'var(--success)':'var(--text-muted)'}">${i + 1}</div>
                 <div style="flex:1;font-size:12px">
-                  <div style="color:var(--text-primary)">${w.zone_name || `Zone ${w.area_id}`}</div>
-                  <div style="color:var(--text-muted)">${w.estimated_arrival ? 'ETA: ' + fmtDate(w.estimated_arrival) : ''}</div>
-                </div>
+  <div style="color:var(--text-primary)">
+    ${w.zone_name || `Zone ${w.area_id}`}
+  </div>
+  <div style="color:var(--text-muted)">
+    ${w.estimated_arrival ? 'ETA: ' + fmtDate(w.estimated_arrival) : ''}
+  </div>
+
+  ${p.status === 'active' && w.status !== 'reached' ? `
+    <div style="margin-top:6px;display:flex;gap:6px">
+      <button onclick="updateWaypoint(${w.id}, 'reached')" 
+        class="btn-sm btn-primary">✔ Done</button>
+
+      <button onclick="updateWaypoint(${w.id}, 'skipped')" 
+        class="btn-sm btn-danger">✖ Skip</button>
+    </div>
+  ` : ''}
+</div>
                 <span style="font-size:10px;color:${w.status==='reached'?'var(--success)':w.status==='skipped'?'var(--danger)':'var(--text-muted)'}">${w.status.toUpperCase()}</span>
               </div>
             `).join('')}
@@ -139,6 +154,22 @@ async function viewPatrol(id) {
     document.getElementById('patrolDetailModal').classList.add('active');
   } catch {
     showToast('Error loading patrol details', 'error');
+  }
+}
+
+async function updateWaypoint(id, status) {
+  try {
+    await API.put(`/patrols/waypoint/${id}`, { status });
+
+    showToast(`Zone marked as ${status}`, 'success');
+
+    // reload modal
+    const modal = document.getElementById('patrolDetailModal');
+    const patrolId = modal.getAttribute('data-id');
+
+    viewPatrol(patrolId);
+  } catch {
+    showToast('Failed to update waypoint', 'error');
   }
 }
 

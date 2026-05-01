@@ -33,10 +33,12 @@ exports.getOfficerWorkload = async () => {
 exports.isOfficerAvailable = async (officerId, startTime, endTime) => {
   const [conflicts] = await db.query(
     `SELECT id FROM patrols 
-     WHERE officer_id = ? 
-     AND status NOT IN ('completed', 'cancelled')
-     AND ((start_time BETWEEN ? AND ?) OR (end_time BETWEEN ? AND ?))`,
-    [officerId, startTime, endTime, startTime, endTime]
+    WHERE officer_id = ? 
+    AND status NOT IN ('completed', 'cancelled')
+    AND NOT (
+      end_time <= ? OR start_time >= ?
+    )`,
+    [officerId, startTime, endTime]
   );
   return conflicts.length === 0;
 };

@@ -9,5 +9,6 @@ router.post('/suggest', patrolController.generatePatrolSuggestions);
 router.get('/:id', patrolController.getPatrolById);
 router.post('/', patrolController.createPatrol);
 router.put('/:id/status', patrolController.updatePatrolStatus);
+router.put('/waypoint/:waypoint_id', patrolController.updateWaypointStatus);
 
 module.exports = router;

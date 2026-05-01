@@ -193,6 +193,7 @@ async function loadPatrolSuggestions() {
   try {
     const res = await API.patrols.suggest();
     const { suggestions, shift, available_officers, high_risk_zones } = res.data || {};
+    window.suggestionsData = suggestions;
 
     if (!suggestions?.length) {
       el.innerHTML = '<div class="empty-state"><i class="fas fa-circle-check"></i><p>All zones covered. No urgent suggestions.</p></div>';
@@ -203,7 +204,7 @@ async function loadPatrolSuggestions() {
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">
         <i class="fas fa-clock"></i> ${shift} shift · ${available_officers} available officers · ${high_risk_zones} high-risk zones
       </div>
-      ${suggestions.map(s => `
+      ${suggestions.map((s, index) => `
         <div class="suggestion-item">
           <div class="suggestion-header">
             <span class="priority-badge priority-${s.priority}">${s.priority} PRIORITY</span>
@@ -216,7 +217,7 @@ async function loadPatrolSuggestions() {
             <i class="fas fa-location-dot"></i> ${s.primary_zone.name} — Risk: ${s.primary_zone.risk_score}/100
           </div>
           <div class="suggestion-reason">${s.reason}</div>
-          <button class="btn-assign" onclick="assignPatrol(${s.officer.id}, ${s.primary_zone.id})">
+          <button class="btn-assign" onclick="assignPatrolByIndex(${index})">
             <i class="fas fa-check"></i> Assign Patrol
           </button>
         </div>
@@ -227,18 +228,26 @@ async function loadPatrolSuggestions() {
   }
 }
 
-async function assignPatrol(officerId, areaId) {
-  try {
-    const start = new Date();
-    const end = new Date(start.getTime() + 4 * 60 * 60 * 1000);
+function assignPatrolByIndex(index) {
+  const suggestion = window.suggestionsData[index];
+  assignPatrol(suggestion);
+}
 
+async function assignPatrol(suggestion) {
+  try {
     await API.patrols.create({
-      officer_id: officerId,
-      area_ids: [areaId],
-      start_time: start.toISOString(),
-      end_time: end.toISOString(),
-      notes: 'AI-suggested patrol'
-    });
+  officer_id: suggestion.officer.id,
+
+  // ✅ MULTI-ZONE FIX
+  area_ids: [
+    suggestion.primary_zone.id,
+    ...suggestion.additional_zones.map(z => z.id)
+  ],
+
+  start_time: suggestion.suggested_start_time,
+  end_time: suggestion.suggested_end_time,
+  notes: 'AI-suggested patrol'
+});
 
     showToast('Patrol assigned successfully!', 'success');
     loadStats();
