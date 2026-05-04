@@ -3,10 +3,26 @@ const officerService = require('./officerService');
 const routeService = require('./routeService');
 
 // Generate smart AI patrol suggestions
-exports.generateSmartSuggestions = async () => {
-  const currentHour = new Date().getHours();
-  const currentShift = currentHour >= 6 && currentHour < 14 ? 'morning'
-    : currentHour >= 14 && currentHour < 22 ? 'evening' : 'night';
+exports.generateSmartSuggestions = async (timeframe = 'current') => {
+  let baseDate = new Date();
+  let currentShift;
+  let targetHour = baseDate.getHours();
+  let targetDay = baseDate.getDay() + 1; // MySQL DAYOFWEEK is 1=Sun, 2=Mon...
+
+  // 1. Calculate Target Time & Shift
+  if (timeframe === 'current') {
+    currentShift = targetHour >= 6 && targetHour < 14 ? 'morning'
+      : targetHour >= 14 && targetHour < 22 ? 'evening' : 'night';
+  } else {
+    // Time travel to tomorrow
+    baseDate.setDate(baseDate.getDate() + 1);
+    targetDay = baseDate.getDay() + 1;
+    currentShift = timeframe.replace('tomorrow_', ''); 
+    
+    if (currentShift === 'morning') targetHour = 6;
+    else if (currentShift === 'evening') targetHour = 14;
+    else if (currentShift === 'night') targetHour = 22;
+  }
 
   let availableOfficers = await officerService.getOfficersByShift(currentShift);
   let crossShiftUsed = false;
@@ -15,8 +31,6 @@ exports.generateSmartSuggestions = async () => {
     availableOfficers = await officerService.getAllAvailableOfficers();
     crossShiftUsed = true;
   }
-
-  // 🌟 THE FIX 1: REMOVED the early exit! We no longer return [] if availableOfficers is 0.
 
   const [activePatrols] = await db.query(`
     SELECT DISTINCT pw.area_id 
@@ -27,27 +41,45 @@ exports.generateSmartSuggestions = async () => {
   
   const activeZoneIds = new Set(activePatrols.map(p => p.area_id).filter(id => id != null));
 
+  // 🌟 THE MAGIC: Dynamic Risk Query based on Target Hour and Day
   const [allHotspots] = await db.query(`
-    SELECT h.*, COUNT(c.id) as recent_crimes
+    SELECT h.*, 
+           COUNT(DISTINCT c1.id) as recent_crimes,
+           COUNT(DISTINCT c2.id) as time_crimes,
+           SUM(CASE WHEN c2.severity = 'high' THEN 1 ELSE 0 END) as time_high_crimes
     FROM hotspots h
-    LEFT JOIN crimes c ON c.area_id = h.id AND c.occurred_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    LEFT JOIN crimes c1 ON c1.area_id = h.id AND c1.occurred_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    -- Join historical crimes that match our target hour (+/- 2 hrs) and day of week
+    LEFT JOIN crimes c2 ON c2.area_id = h.id 
+      AND ABS(HOUR(c2.occurred_at) - ?) <= 2 
+      AND DAYOFWEEK(c2.occurred_at) = ?
     GROUP BY h.id
-    ORDER BY h.risk_score DESC, recent_crimes DESC
-  `);
+  `, [targetHour, targetDay]);
 
-  let availableZones = allHotspots.filter(h => !activeZoneIds.has(h.id));
-  let hotspots = [];
+  // 🌟 Calculate dynamic risk for the specific time requested
+  let dynamicZones = allHotspots.map(h => {
+    let adjustedScore = h.risk_score || 50;
+    
+    // Boost the score if this zone has a history of crime AT THIS SPECIFIC TIME
+    if (h.time_crimes > 0) {
+      adjustedScore += (h.time_crimes * 2) + ((h.time_high_crimes || 0) * 5);
+    }
+    
+    return { 
+      ...h, 
+      // Override the static score with our new time-traveling dynamic one
+      risk_score: Math.min(100, Math.round(adjustedScore)),
+      original_score: h.risk_score // Keep the old one just in case
+    };
+  }).sort((a, b) => b.risk_score - a.risk_score);
 
-  // Mix 3 High/Medium risk zones with 2 Routine (Low risk) zones
-  if (crossShiftUsed) {
-    hotspots = availableZones.filter(h => h.risk_score > 80).slice(0, 10);
-  } else {
-    const riskyZones = availableZones.filter(h => h.risk_score >= 50).slice(0, 3);
-    const routineZones = availableZones.filter(h => h.risk_score < 50)
-                                       .sort((a, b) => a.risk_score - b.risk_score) 
-                                       .slice(0, 2); 
-    hotspots = [...riskyZones, ...routineZones];
-  }
+  let availableZones = dynamicZones.filter(h => !activeZoneIds.has(h.id));
+
+  const riskyZones = availableZones.filter(h => h.risk_score >= 50).slice(0, 3);
+  const routineZones = availableZones.filter(h => h.risk_score < 50)
+                                     .sort((a, b) => a.risk_score - b.risk_score) 
+                                     .slice(0, 2); 
+  let hotspots = [...riskyZones, ...routineZones];
 
   if (hotspots.length === 0) {
      return {
@@ -63,8 +95,6 @@ exports.generateSmartSuggestions = async () => {
 
   const suggestions = [];
   const usedOfficers = new Set();
-  
-  // 🌟 THE FIX 2: Generate up to 5 routes regardless of how many officers we have
   const maxSuggestions = Math.min(hotspots.length, 5);
 
   const formatDateTime = (d) => {
@@ -81,14 +111,23 @@ exports.generateSmartSuggestions = async () => {
     const priority = hotspot.risk_score >= 75 ? 'HIGH' : hotspot.risk_score >= 50 ? 'MEDIUM' : 'LOW';
     const targetTeamSize = priority === 'HIGH' ? 3 : 2;
     let team = [];
-    let selectedStartTime = new Date();
-    let selectedEndTime = new Date();
     
+    // 🌟 Set the exact patrol time based on what they selected in the dropdown
+    let selectedStartTime = new Date(baseDate);
+    if (timeframe !== 'current') {
+      selectedStartTime.setHours(targetHour, 0, 0, 0);
+    }
+    
+    let selectedEndTime = new Date(selectedStartTime);
     const patrolDuration = priority === 'HIGH' ? 4 : (priority === 'MEDIUM' ? 3 : 2);
     selectedEndTime.setHours(selectedEndTime.getHours() + patrolDuration);
 
     for (let officer of officersByWorkload) {
       if (usedOfficers.has(officer.id)) continue;
+
+      if (crossShiftUsed && priority !== 'HIGH') {
+        continue; 
+      }
       
       const isAvailable = await officerService.isOfficerAvailable(
         officer.id, 
@@ -106,9 +145,6 @@ exports.generateSmartSuggestions = async () => {
         if (team.length >= targetTeamSize) break;
       }
     }
-
-    // 🌟 THE FIX 3: REMOVED `if (team.length === 0) continue;`
-    // We now allow the AI to build the rest of the route even if the team is empty!
 
     activeZoneIds.add(hotspot.id);
     const activeIdsArr = Array.from(activeZoneIds);
@@ -133,7 +169,7 @@ exports.generateSmartSuggestions = async () => {
       additional_zones: selectedZones,
       optimized_route: route,
       suggested_duration_hours: patrolDuration,
-      reason: buildReason(hotspot, currentHour, crossShiftUsed, team.length === 0), // <-- Pass empty team flag
+      reason: buildReason(hotspot, targetHour, crossShiftUsed, team.length === 0), // Use targetHour here
       shift: currentShift
     });
 
@@ -147,7 +183,6 @@ exports.generateSmartSuggestions = async () => {
   };
 };
 
-// 🌟 THE FIX 4: Update reasoning to handle unassigned routes
 function buildReason(hotspot, hour, crossShiftUsed, isUnassigned) {
   const reasons = [];
   

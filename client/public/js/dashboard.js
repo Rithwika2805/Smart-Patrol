@@ -195,8 +195,11 @@ async function loadPatrolSuggestions() {
   const el = document.getElementById('patrolSuggestions');
   el.innerHTML = '<div class="loading-spinner"></div>';
 
+  const timeframe = document.getElementById('suggestionTimeframe')?.value || 'current';
+
   try {
-    const res = await API.patrols.suggest();
+    const res = await API.patrols.suggest({ timeframe });
+    
     const { suggestions = [], shift, available_officers, high_risk_zones } = res.data || {};
     window.suggestionsData = suggestions;
 

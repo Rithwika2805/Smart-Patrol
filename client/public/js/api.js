@@ -80,7 +80,7 @@ const API = {
     getAnalytics: () => API.get('/patrols/analytics'),
     create: (data) => API.post('/patrols', data),
     updateStatus: (id, data) => API.put(`/patrols/${id}/status`, data),
-    suggest: () => API.post('/patrols/suggest', {})
+    suggest: (data = {}) => API.post('/patrols/suggest', data)
   },
 
   stations: {

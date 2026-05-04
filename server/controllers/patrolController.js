@@ -198,7 +198,7 @@ exports.updatePatrolStatus = async (req, res) => {
 // POST generate AI patrol suggestions
 exports.generatePatrolSuggestions = async (req, res) => {
   try {
-    const suggestions = await patrolService.generateSmartSuggestions();
+    const suggestions = await patrolService.generateSmartSuggestions(req.body.timeframe);
     res.json({ success: true, data: suggestions });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
