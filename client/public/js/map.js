@@ -127,7 +127,15 @@ async function loadActivePatrols() {
     const res = await API.patrols.getActive();
     const patrols = res.data || [];
 
+    // 🌟 THE FIX 1: Create a palette of highly distinct, neon UI colors
+    const teamColors = ['#00d4ff', '#ff4757', '#2ed573', '#ffa502', '#e056fd', '#ff9f43', '#10ac84'];
+    let colorIndex = 0;
+
     for (const p of patrols) {
+      // 🌟 THE FIX 2: Pick a unique color for this specific patrol team
+      const routeColor = teamColors[colorIndex % teamColors.length];
+      colorIndex++;
+
       // Fetch waypoints FIRST to establish a fallback location
       let wps = [];
       try {
@@ -137,35 +145,34 @@ async function loadActivePatrols() {
         console.warn('Could not fetch route details for patrol id:', p.id);
       }
 
-      // Fallback to the first waypoint if current_lat is null (newly started patrols)
+      // Fallback to the first waypoint if current_lat is null
       const startLat = p.current_lat || (wps[0] ? wps[0].lat : null);
       const startLng = p.current_lng || (wps[0] ? wps[0].lng : null);
 
-      // If we STILL don't have coordinates, we can't draw this patrol
       if (!startLat || !startLng) continue;
 
-      // 1. Draw the actual Officer Marker
+      // 🌟 THE FIX 3: Inject the dynamic routeColor into the Officer's Marker and Glow!
       const officerIcon = L.divIcon({
-        html: `<div style="background:#5352ed;border:2px solid #fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:bold;box-shadow:0 0 10px rgba(83, 82, 237, 0.5)">${p.officer_name.charAt(0)}</div>`,
+        html: `<div style="background:${routeColor};border:2px solid #fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:bold;box-shadow:0 0 10px ${routeColor}80">${p.officer_name.charAt(0)}</div>`,
         iconSize: [24, 24],
         iconAnchor: [12, 12]
       });
+      
       const marker = L.marker([startLat, startLng], { icon: officerIcon, zIndexOffset: 500 });
       marker.bindPopup(`
         <div style="font-family:'Exo 2',sans-serif">
           <b>${p.officer_name}</b><br/>
-          <span style="font-size:11px;color:#5352ed">${p.designation} · ${p.badge_number}</span><br/>
+          <span style="font-size:11px;color:${routeColor}">${p.designation} · ${p.badge_number}</span><br/>
           <span style="font-size:11px;color:green">● ACTIVE PATROL</span>
         </div>
       `);
       marker.addTo(map);
       layerGroups.patrols.push(marker);
 
-      // 2. Draw the Route Line (only to pending waypoints)
+      // 2. Draw the Route Line
       if (wps.length > 0) {
         const pendingWps = wps.filter(w => w.status !== 'reached' && w.status !== 'skipped');
         
-        // Draw line from current position through the remaining waypoints
         const latLngs = [
           [startLat, startLng], 
           ...pendingWps.map(w => [w.lat, w.lng])
@@ -178,16 +185,17 @@ async function loadActivePatrols() {
               serviceUrl: 'https://router.project-osrm.org/route/v1'
             }),
             lineOptions: {
+              // 🌟 THE FIX 4: Apply the dynamic color to the dashed line
               styles: [
-                { color: '#1e3799', weight: 8, opacity: 0.8 }, // Dark blue shadow
-                { color: '#00d4ff', weight: 4, opacity: 1, dashArray: '8, 6' } // Bright cyan dashed inner
+                { color: '#1a1a2e', weight: 8, opacity: 0.7 }, // Generic dark shadow for contrast
+                { color: routeColor, weight: 4, opacity: 1, dashArray: '8, 6' } // Distinct team color
               ],
               extendToWaypoints: true,
               missingRouteTolerance: 0
             },
-            show: false,          // Hides the text-based turn-by-turn directions box
-            addWaypoints: false,  // Prevents users from dragging the route
-            fitSelectedRoutes: false, // Prevents map from zooming out wildly
+            show: false,         
+            addWaypoints: false,  
+            fitSelectedRoutes: false, 
             createMarker: function() { return null; }
           }).addTo(map);
           
