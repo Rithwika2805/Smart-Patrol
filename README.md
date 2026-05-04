@@ -143,7 +143,7 @@ Open your browser and go to: **http://localhost:5000**
 
 ---
 
-## Default Login (after seeding)
+## Login (after seeding)
 
-The system uses single-user mode. No login required for demo.
-For production, add JWT authentication to `server/index.js`.
+username : admin
+password : PatrolAI
