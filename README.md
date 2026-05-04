@@ -1,4 +1,4 @@
-# 🚔 PATROL-AI
+# PATROL-AI
 
 **AI-Driven Police Patrol & Crime Prediction Platform**
 
@@ -6,7 +6,7 @@
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 Patrol-AI/
@@ -51,7 +51,7 @@ Patrol-AI/
 
 ---
 
-## ⚙️ Setup Instructions
+## Setup Instructions
 
 ### 1. Database Setup (MySQL)
 
@@ -98,7 +98,7 @@ Open your browser and go to: **http://localhost:5000**
 
 ---
 
-## 🌐 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -118,19 +118,19 @@ Open your browser and go to: **http://localhost:5000**
 
 ---
 
-## ✨ Features
+## Features
 
-- **📊 Live Dashboard** — Real-time stats, crime chart, hotspot list
-- **🗺️ Interactive Map** — Leaflet map with hotspot layers and patrol positions
-- **🧠 AI Risk Predictor** — Predicts crime risk by zone, hour, and day
-- **🚔 Patrol Route Optimizer** — Nearest-Neighbor TSP algorithm, risk-weighted
-- **📋 Crime Management** — Full CRUD for FIR records
-- **👮 Officer Management** — Track availability, shifts, and workload
-- **📈 Analytics Charts** — Crime by area/hour, patrol coverage, officer performance
+- **Live Dashboard** — Real-time stats, crime chart, hotspot list
+- **Interactive Map** — Leaflet map with hotspot layers and patrol positions
+- **AI Risk Predictor** — Predicts crime risk by zone, hour, and day
+- **Patrol Route Optimizer** — Nearest-Neighbor TSP algorithm, risk-weighted
+- **Crime Management** — Full CRUD for FIR records
+- **Officer Management** — Track availability, shifts, and workload
+- **Analytics Charts** — Crime by area/hour, patrol coverage, officer performance
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -143,7 +143,7 @@ Open your browser and go to: **http://localhost:5000**
 
 ---
 
-## 🔑 Default Login (after seeding)
+## Default Login (after seeding)
 
 The system uses single-user mode. No login required for demo.
 For production, add JWT authentication to `server/index.js`.
