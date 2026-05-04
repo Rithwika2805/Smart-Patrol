@@ -12,6 +12,14 @@ async function seed() {
   console.log('Seeding Patrol-AI database...');
 
   try {
+    // USERS
+    const adminPasswordHash = '$10$2QZ8jRdC7VTcaaZ9FdV7UubL3iJsPvonNX846uSVl9VsxZr5VS/Tq'; // Hash for 'PatrolAI'
+    await conn.query(`
+      INSERT INTO users (username, password_hash, role) VALUES 
+      ('admin', ?, 'admin')
+    `, [adminPasswordHash]);
+    console.log('Admin user (PatrolAI) seeded');
+
     // STATIONS
     await conn.query(`DELETE FROM patrol_waypoints`);
     await conn.query(`DELETE FROM patrols`);
