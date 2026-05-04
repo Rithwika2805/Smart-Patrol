@@ -7,9 +7,10 @@
   <link rel="stylesheet" href="css/style.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet"/>
   <style>
-    #map { height: calc(100vh - 64px); width: 100%; background: #0d1520; }
+    #map { height: calc(100vh - 64px); width: 100%; }
     .map-controls {
       position: absolute; top: 80px; right: 24px; z-index: 1000;
       display: flex; flex-direction: column; gap: 8px;
@@ -28,8 +29,6 @@
       display: flex; align-items: center; gap: 6px;
     }
     .map-ctrl-btn:hover, .map-ctrl-btn.active { background: var(--accent-glow); border-color: var(--accent); color: var(--accent); }
-    .leaflet-tile { filter: brightness(1) saturate(0.3) hue-rotate(190deg); }
-    .leaflet-container { background: #0d1520; }
     .hotspot-marker { border-radius: 50%; border: 2px solid; opacity: 0.85; }
   </style>
 </head>
@@ -99,6 +98,7 @@
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
   <script src="js/api.js"></script>
   <script src="js/map.js"></script>
 </body>

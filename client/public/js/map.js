@@ -172,16 +172,26 @@ async function loadActivePatrols() {
         ];
 
         if (latLngs.length > 1) {
-          const routeLine = L.polyline(latLngs, {
-            color: '#5352ed',
-            weight: 3,
-            dashArray: '8, 8', // Dashed line
-            opacity: 0.7,
-            lineJoin: 'round'
-          });
+          const routingControl = L.Routing.control({
+            waypoints: latLngs.map(coord => L.latLng(coord[0], coord[1])),
+            router: L.Routing.osrmv1({
+              serviceUrl: 'https://router.project-osrm.org/route/v1'
+            }),
+            lineOptions: {
+              styles: [
+                { color: '#1e3799', weight: 8, opacity: 0.8 }, // Dark blue shadow
+                { color: '#00d4ff', weight: 4, opacity: 1, dashArray: '8, 6' } // Bright cyan dashed inner
+              ],
+              extendToWaypoints: true,
+              missingRouteTolerance: 0
+            },
+            show: false,          // Hides the text-based turn-by-turn directions box
+            addWaypoints: false,  // Prevents users from dragging the route
+            fitSelectedRoutes: false, // Prevents map from zooming out wildly
+            createMarker: function() { return null; }
+          }).addTo(map);
           
-          routeLine.addTo(map);
-          layerGroups.patrols.push(routeLine);
+          layerGroups.patrols.push(routingControl);
         }
       }
     }
@@ -191,7 +201,14 @@ async function loadActivePatrols() {
 }
 
 function clearLayer(name) {
-  layerGroups[name].forEach(m => map.removeLayer(m));
+  layerGroups[name].forEach(m => {
+    // Check if it's a routing control that needs a special removal method
+    if (m.getPlan) {
+      map.removeControl(m);
+    } else {
+      map.removeLayer(m);
+    }
+  });
   layerGroups[name] = [];
 }
 

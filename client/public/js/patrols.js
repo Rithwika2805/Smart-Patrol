@@ -107,52 +107,123 @@ async function viewPatrol(id) {
     const res = await API.patrols.getById(id);
     const p = res.data;
     document.getElementById('patrolDetailModal').setAttribute('data-id', id);
+    
     const wps = p.waypoints || [];
+    const team = p.team || [{ name: p.officer_name, designation: p.designation, badge_number: p.badge_number }];
+    
+    // Parse the JSON string stored in the database to extract the distance/duration
+    let routeData = {};
+    try { routeData = typeof p.route_data === 'string' ? JSON.parse(p.route_data) : p.route_data; } catch(e) {}
 
-    document.getElementById('patrolDetailBody').innerHTML = `
-      <div style="display:grid;gap:14px">
-        <div style="display:flex;gap:10px;align-items:center">
-          <span class="status-badge status-${p.status}">${p.status.toUpperCase()}</span>
-          <span style="font-size:13px;color:var(--text-secondary)">${p.officer_name} · ${p.designation} · ${p.badge_number}</span>
+    // 1. Build Team Roster UI
+    let teamHtml = `
+      <div style="margin-bottom: 20px; background: var(--bg-primary); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+        <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Team Roster</h4>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${team.map(o => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background: var(--bg-secondary); padding: 8px 12px; border: 1px solid var(--border-light); border-radius: 4px; font-size:13px;">
+              <div><strong>${o.designation} ${o.name}</strong> <span style="color:var(--text-muted);font-size:11px">(${o.badge_number})</span></div>
+            </div>
+          `).join('')}
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px">
-          <div><span style="color:var(--text-muted)">Start:</span> <span style="color:var(--text-primary)">${p.start_time ? fmtDate(p.start_time) : '—'}</span></div>
-          <div><span style="color:var(--text-muted)">End:</span> <span style="color:var(--text-primary)">${p.end_time ? fmtDate(p.end_time) : 'Ongoing'}</span></div>
-        </div>
-        ${p.notes ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic">${p.notes}</div>` : ''}
-        ${wps.length ? `
-          <div>
-            <div style="font-family:var(--font-display);font-size:12px;color:var(--accent);letter-spacing:1px;margin-bottom:8px">WAYPOINTS</div>
-            ${wps.map((w, i) => `
-              <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-                <div style="width:24px;height:24px;background:${w.status==='reached'?'var(--success-dim)':'var(--border)'};border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--font-display);color:${w.status==='reached'?'var(--success)':'var(--text-muted)'}">${i + 1}</div>
-                <div style="flex:1;font-size:12px">
-  <div style="color:var(--text-primary)">
-    ${w.zone_name || `Zone ${w.area_id}`}
-  </div>
-  <div style="color:var(--text-muted)">
-    ${w.estimated_arrival ? 'ETA: ' + fmtDate(w.estimated_arrival) : ''}
-  </div>
-
-  ${p.status === 'active' && w.status !== 'reached' ? `
-    <div style="margin-top:6px;display:flex;gap:6px">
-      <button onclick="updateWaypoint(${w.id}, 'reached')" 
-        class="btn-sm btn-primary">✔ Done</button>
-
-      <button onclick="updateWaypoint(${w.id}, 'skipped')" 
-        class="btn-sm btn-danger">✖ Skip</button>
-    </div>
-  ` : ''}
-</div>
-                <span style="font-size:10px;color:${w.status==='reached'?'var(--success)':w.status==='skipped'?'var(--danger)':'var(--text-muted)'}">${w.status.toUpperCase()}</span>
-              </div>
-            `).join('')}
-          </div>
-        ` : '<div style="font-size:12px;color:var(--text-muted)">No waypoints recorded</div>'}
       </div>
     `;
+
+    // 2. Build Details Header
+    let detailsHtml = `
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; font-size: 13px;">
+        <div><strong>Start:</strong> <span style="color:var(--text-primary)">${p.start_time ? fmtDate(p.start_time) : '—'}</span></div>
+        <div><strong>End:</strong> <span style="color:var(--text-primary)">${p.end_time ? fmtDate(p.end_time) : 'Ongoing'}</span></div>
+        <div><strong>Metrics:</strong> ~${routeData?.total_distance_km || 0} km / ${routeData?.estimated_duration_min || 0} min</div>
+        <div><strong>Status:</strong> <span class="status-badge status-${p.status}">${p.status.toUpperCase()}</span></div>
+      </div>
+      ${p.notes ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic;margin-bottom:20px;">${p.notes}</div>` : ''}
+    `;
+
+    // 3. Build Dynamic Topological Graph
+    let graphHtml = '';
+    if (wps.length > 0) {
+      let minLat = Math.min(...wps.map(w => w.lat));
+      let maxLat = Math.max(...wps.map(w => w.lat));
+      let minLng = Math.min(...wps.map(w => w.lng));
+      let maxLng = Math.max(...wps.map(w => w.lng));
+
+      let latRange = (maxLat - minLat) || 0.01;
+      let lngRange = (maxLng - minLng) || 0.01;
+
+      let pointsHtml = '';
+      let svgLines = '';
+      let prevX, prevY;
+
+      wps.forEach((w, i) => {
+        let x = ((w.lng - minLng) / lngRange) * 60 + 20; 
+        let y = 100 - (((w.lat - minLat) / latRange) * 60 + 20); 
+
+        if (i > 0) {
+          svgLines += `<line x1="${prevX}%" y1="${prevY}%" x2="${x}%" y2="${y}%" stroke="var(--accent)" stroke-width="3" stroke-dasharray="6,4" opacity="0.5" />`;
+        }
+
+        // Change color to green if the waypoint has been reached!
+        const nodeColor = w.status === 'reached' ? 'var(--success)' : 'var(--accent)';
+        const glowColor = w.status === 'reached' ? 'var(--success-dim)' : 'var(--accent-glow)';
+
+        pointsHtml += `
+          <div style="position:absolute; left:${x}%; top:${y}%; transform:translate(-50%, -50%); width:24px; height:24px; background:${nodeColor}; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; z-index:2; box-shadow:0 0 0 4px ${glowColor};" title="${w.zone_name || 'Zone'}">
+            ${i + 1}
+          </div>
+          <div style="position:absolute; left:${x}%; top:${y}%; transform:translate(-50%, 18px); font-size:10px; font-weight:500; white-space:nowrap; color:var(--text-secondary); background:var(--bg-secondary); padding:2px 6px; border-radius:4px; border: 1px solid var(--border); z-index:3; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+             ${w.zone_name || `Zone ${w.area_id}`}
+          </div>
+        `;
+        prevX = x; prevY = y;
+      });
+
+      graphHtml = `
+        <div style="margin-bottom: 20px;">
+          <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Topological Route Graph</h4>
+          <div style="position: relative; width: 100%; height: 240px; background: #eef2f6; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 20px 20px;">
+            <svg style="position: absolute; top:0; left:0; width:100%; height:100%; z-index:1; pointer-events:none;">
+              ${svgLines}
+            </svg>
+            ${pointsHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    // 4. Build Timeline List
+    let timelineHtml = `
+      <div>
+        <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Waypoints</h4>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          ${wps.map((w, i) => `
+            <div style="display:flex; align-items:center; gap: 12px; font-size: 13px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);">
+              <div style="width:28px; height:28px; background:${w.status==='reached'?'var(--success-dim)':'var(--bg-primary)'}; color:${w.status==='reached'?'var(--success)':'var(--text-secondary)'}; border: 1px solid ${w.status==='reached'?'var(--success)':'var(--border)'}; display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">${i + 1}</div>
+              <div style="flex:1;">
+                <div style="font-weight:600; color:var(--text-primary);">${w.zone_name || `Zone ${w.area_id}`}</div>
+                <div style="color:var(--text-muted); font-size: 11px;">
+                  ${w.risk_score ? `Risk Score: <span style="color:var(--danger); font-weight:600;">${w.risk_score}</span> · ` : ''}
+                  ETA: ${w.estimated_arrival ? fmtDate(w.estimated_arrival) : '--:--'}
+                </div>
+                ${p.status === 'active' && w.status !== 'reached' ? `
+                  <div style="margin-top:6px;display:flex;gap:6px">
+                    <button onclick="updateWaypoint(${w.id}, 'reached')" class="btn-sm btn-primary" style="padding:4px 8px;">✔ Done</button>
+                    <button onclick="updateWaypoint(${w.id}, 'skipped')" class="btn-sm btn-danger" style="padding:4px 8px;">✖ Skip</button>
+                  </div>
+                ` : ''}
+              </div>
+              <div style="text-align:right;">
+                <span style="font-size:10px; font-weight:bold; color:${w.status==='reached'?'var(--success)':w.status==='skipped'?'var(--danger)':'var(--text-muted)'}">${w.status.toUpperCase()}</span>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    document.getElementById('patrolDetailBody').innerHTML = teamHtml + detailsHtml + graphHtml + timelineHtml;
     document.getElementById('patrolDetailModal').classList.add('active');
-  } catch {
+  } catch (err) {
     showToast('Error loading patrol details', 'error');
   }
 }

@@ -23,7 +23,7 @@ exports.getAllPatrols = async (req, res) => {
   }
 };
 
-// GET patrol by ID with full route
+// GET patrol by ID with full route, zone names, and team members
 exports.getPatrolById = async (req, res) => {
   try {
     const [patrol] = await db.query(
@@ -33,12 +33,25 @@ exports.getPatrolById = async (req, res) => {
     );
     if (!patrol.length) return res.status(404).json({ success: false, error: 'Patrol not found' });
 
+    // 1. Join hotspots to get the actual zone_name and risk_score
     const [waypoints] = await db.query(
-      `SELECT * FROM patrol_waypoints WHERE patrol_id = ? ORDER BY sequence_order`,
+      `SELECT pw.*, h.zone_name, h.risk_score
+       FROM patrol_waypoints pw 
+       LEFT JOIN hotspots h ON pw.area_id = h.id
+       WHERE pw.patrol_id = ? ORDER BY pw.sequence_order`,
       [req.params.id]
     );
 
-    res.json({ success: true, data: { ...patrol[0], waypoints } });
+    // 2. Fetch team members by finding officers assigned to identical shifts
+    const [team] = await db.query(
+      `SELECT o.id, o.name, o.designation, o.badge_number 
+       FROM patrols p 
+       JOIN officers o ON p.officer_id = o.id 
+       WHERE p.start_time = ? AND p.end_time = ? AND p.status = ?`,
+      [patrol[0].start_time, patrol[0].end_time, patrol[0].status]
+    );
+
+    res.json({ success: true, data: { ...patrol[0], waypoints, team } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -47,86 +60,58 @@ exports.getPatrolById = async (req, res) => {
 // POST create patrol assignment
 exports.createPatrol = async (req, res) => {
   try {
-    const { officer_id, area_ids, start_time, end_time, notes } = req.body;
+    const { area_ids, start_time, end_time, notes } = req.body;
+    
+    // Backwards compatible: Handle both single officer_id or array of officer_ids
+    let targetOfficers = [];
+    if (req.body.officer_ids) targetOfficers = req.body.officer_ids;
+    else if (req.body.officer_id) targetOfficers = [req.body.officer_id];
+
+    if (!targetOfficers.length || !area_ids?.length) {
+      return res.status(400).json({ success: false, error: 'officer_id(s) and area_ids required' });
+    }
 
     const formatDateTime = (iso) => {
       const d = new Date(iso);
-
       const pad = (n) => n.toString().padStart(2, '0');
-
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
-            `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     };
 
     const formattedStart = formatDateTime(start_time);
     const formattedEnd = formatDateTime(end_time);
 
-    if (!officer_id || !area_ids?.length) {
-      return res.status(400).json({ success: false, error: 'officer_id and area_ids required' });
-    }
-
-    // Verify officer is available
-    const [officer] = await db.query(
-      `SELECT * FROM officers WHERE id = ?`,
-      [officer_id]
-    );
-
-    if (!officer.length) {
-      return res.status(400).json({ success: false, error: 'Officer not found' });
-    }
-
-    // 🧠 Check real availability using time slot
-    const isAvailable = await officerService.isOfficerAvailable(
-      officer_id,
-      formattedStart,
-      formattedEnd
-    );
-
-    if (!isAvailable) {
-      return res.status(400).json({
-        success: false,
-        error: 'Officer not available in this time slot'
-      });
-    }
-
-    // Generate optimized route
+    // Generate optimized route ONCE for the whole team
     const optimizedRoute = await routeService.generateOptimizedRoute(area_ids);
+    const insertedPatrolIds = [];
 
-    const [result] = await db.query(
-      `INSERT INTO patrols (officer_id, route_data, start_time, end_time, status, notes, created_at)
-       VALUES (?, ?, ?, ?, 'scheduled', ?, NOW())`,
-      [officer_id, JSON.stringify(optimizedRoute), formattedStart, formattedEnd, notes]
-    );
+    // Loop through team and assign them all the exact same route
+    for (let officer_id of targetOfficers) {
+      const isAvailable = await officerService.isOfficerAvailable(officer_id, formattedStart, formattedEnd);
+      if (!isAvailable) continue; // Skip if this specific officer got busy
 
-    // Insert waypoints
-    if (optimizedRoute.waypoints?.length) {
-      for (let i = 0; i < optimizedRoute.waypoints.length; i++) {
-        const wp = optimizedRoute.waypoints[i];
-        await db.query(
-          `INSERT INTO patrol_waypoints (patrol_id, area_id, lat, lng, sequence_order, estimated_arrival)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [result.insertId, wp.area_id, wp.lat, wp.lng, i + 1, formatDateTime(wp.estimated_arrival)]
-        );
+      const [result] = await db.query(
+        `INSERT INTO patrols (officer_id, route_data, start_time, end_time, status, notes, created_at)
+         VALUES (?, ?, ?, ?, 'scheduled', ?, NOW())`,
+        [officer_id, JSON.stringify(optimizedRoute), formattedStart, formattedEnd, notes]
+      );
+
+      if (optimizedRoute.waypoints?.length) {
+        for (let i = 0; i < optimizedRoute.waypoints.length; i++) {
+          const wp = optimizedRoute.waypoints[i];
+          await db.query(
+            `INSERT INTO patrol_waypoints (patrol_id, area_id, lat, lng, sequence_order, estimated_arrival)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [result.insertId, wp.area_id, wp.lat, wp.lng, i + 1, formatDateTime(wp.estimated_arrival)]
+          );
+        }
       }
+      await db.query(`UPDATE officers SET status = 'on_duty' WHERE id = ?`, [officer_id]);
+      insertedPatrolIds.push(result.insertId);
     }
 
-    // Update officer status
-    await db.query(`UPDATE officers SET status = 'on_duty' WHERE id = ?`, [officer_id]);
-
-    res.status(201).json({
-      success: true,
-      data: { id: result.insertId, route: optimizedRoute },
-      message: 'Patrol assigned successfully'
-    });
+    res.status(201).json({ success: true, data: { ids: insertedPatrolIds, route: optimizedRoute }, message: 'Team Patrol assigned' });
   } catch (err) {
-    console.error("🔥🔥 CREATE PATROL ERROR FULL:", err);
-    console.error("🔥 STACK:", err.stack);
-
-    res.status(500).json({
-      success: false,
-      error: err.message,
-      stack: err.stack
-    });
+    res.status(500).json({ success: false, error: err.message });
   }
 };
 

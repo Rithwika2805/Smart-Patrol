@@ -196,13 +196,13 @@ async function loadPatrolSuggestions() {
     window.suggestionsData = suggestions;
 
     if (!suggestions?.length) {
-      el.innerHTML = '<div class="empty-state"><i class="fas fa-circle-check"></i><p>All zones covered. No urgent suggestions.</p></div>';
+      el.innerHTML = '<div class="empty-state"><i class="fas fa-circle-check"></i><p>All active zones covered. No urgent suggestions.</p></div>';
       return;
     }
 
     el.innerHTML = `
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px">
-        <i class="fas fa-clock"></i> ${shift} shift · ${available_officers} available officers · ${high_risk_zones} high-risk zones
+        <i class="fas fa-clock"></i> ${shift} shift · ${available_officers} available officers
       </div>
       ${suggestions.map((s, index) => `
         <div class="suggestion-item">
@@ -210,139 +210,129 @@ async function loadPatrolSuggestions() {
             <span class="priority-badge priority-${s.priority}">${s.priority} PRIORITY</span>
             <span style="font-size:10px;color:var(--text-muted)">${s.suggested_duration_hours}h patrol</span>
           </div>
-          <div class="suggestion-officer">
-            <i class="fas fa-user-shield"></i> ${s.officer.designation} ${s.officer.name} (${s.officer.badge_number})
+          <div class="suggestion-officer" style="margin-bottom:6px;">
+            <i class="fas fa-users"></i> Team: ${s.team.map(o => o.name.split(' ')[0]).join(', ')} <span style="color:var(--text-muted);font-size:11px">(${s.team.length} Officers)</span>
           </div>
           <div class="suggestion-zone">
             <i class="fas fa-location-dot"></i> ${s.primary_zone.name} — Risk: ${s.primary_zone.risk_score}/100
           </div>
           <div class="suggestion-reason">${s.reason}</div>
           <div style="display: flex; gap: 8px; margin-top: 10px;">
-            <button class="btn-sm btn-secondary" style="flex:1; justify-content:center" onclick="previewSuggestion(${index})">
-              <i class="fas fa-route"></i> Preview
+            <button class="btn-sm btn-secondary" style="flex:1; justify-content:center" onclick="openTeamPreview(${index})">
+              <i class="fas fa-users-cog"></i> Adjust Team & Preview
             </button>
-            <button class="btn-sm btn-primary" style="flex:1; justify-content:center" onclick="assignPatrolByIndex(${index})">
-              <i class="fas fa-check"></i> Assign
+            <button class="btn-sm btn-primary" style="flex:1; justify-content:center" onclick="assignTeamPatrol(${index})">
+              <i class="fas fa-check"></i> Assign Team
             </button>
           </div>
         </div>
       `).join('')}
     `;
   } catch (err) {
-    el.innerHTML = '<div class="empty-state"><p>Error generating suggestions. Is the server running?</p></div>';
+    el.innerHTML = '<div class="empty-state"><p>Error generating suggestions.</p></div>';
   }
 }
 
-function assignPatrolByIndex(index) {
-  const suggestion = window.suggestionsData[index];
-  assignPatrol(suggestion);
-}
+async function assignTeamPatrol(index) {
+  const s = window.suggestionsData[index];
+  
+  // Only use the modal's modified team if the modal is currently open and modifying THIS suggestion
+  const isModalOpen = document.getElementById('suggestionPreviewModal').classList.contains('active');
+  const teamIds = (isModalOpen && window.currentSuggestionIndex === index) 
+    ? window.currentPreviewTeam.map(o => o.id) 
+    : s.team.map(o => o.id);
+  
+  if (teamIds.length === 0) return showToast('You need at least one officer!', 'error');
 
-async function assignPatrol(suggestion) {
   try {
     await API.patrols.create({
-      officer_id: suggestion.officer.id,
-      // MULTI-ZONE FIX
-      area_ids: [
-        suggestion.primary_zone.id,
-        ...suggestion.additional_zones.map(z => z.id)
-      ],
-      start_time: suggestion.suggested_start_time,
-      end_time: suggestion.suggested_end_time,
-      notes: 'AI-suggested patrol'
+      officer_ids: teamIds, 
+      area_ids: [s.primary_zone.id, ...s.additional_zones.map(z => z.id)],
+      start_time: s.suggested_start_time,
+      end_time: s.suggested_end_time,
+      notes: 'AI-suggested team patrol'
     });
-
-    showToast('Patrol assigned successfully!', 'success');
-    loadStats();
+    showToast('Team patrol assigned successfully!', 'success');
+    document.getElementById('suggestionPreviewModal').classList.remove('active');
+    loadDashboard();
   } catch (err) {
-    showToast('Failed to assign patrol. Officer may not be available.', 'error');
+    showToast('Failed to assign patrol.', 'error');
   }
 }
 
-// --- NEW FUNCTIONS GO DOWN HERE, COMPLETELY OUTSIDE OTHER FUNCTIONS --- //
+// Global state for the preview modal
+window.currentPreviewTeam = [];
+window.availablePool = [];
+window.currentSuggestionIndex = null;
 
-window.previewSuggestion = function(index) {
+window.openTeamPreview = async function(index) {
+  window.currentSuggestionIndex = index;
   const s = window.suggestionsData[index];
-  const route = s.optimized_route || {};
-  const wps = route.waypoints || [];
+  window.currentPreviewTeam = [...s.team]; 
+  
+  // Fetch available officers for the swap dropdown
+  const res = await API.officers.getAvailable();
+  window.availablePool = res.data || [];
+  
+  renderPreviewModal();
+  document.getElementById('suggestionPreviewModal').classList.add('active');
+};
 
-  // 1. Build Details Header
-  let detailsHtml = `
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; font-size: 13px; background: var(--bg-primary); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-      <div><strong>Officer:</strong> <span style="color:var(--accent)">${s.officer.designation} ${s.officer.name}</span></div>
-      <div><strong>Shift:</strong> ${s.shift ? s.shift.toUpperCase() : 'N/A'}</div>
-      <div><strong>Start Time:</strong> ${s.suggested_start_time ? new Date(s.suggested_start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Now'}</div>
-      <div><strong>Metrics:</strong> ~${route.total_distance_km || 0} km / ${route.estimated_duration_min || 0} min</div>
+window.renderPreviewModal = function() {
+  const s = window.suggestionsData[window.currentSuggestionIndex];
+  const wps = s.optimized_route.waypoints || [];
+
+  // 1. Build Team Roster UI
+  let teamHtml = `
+    <div style="margin-bottom: 20px; background: var(--bg-primary); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+      <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Team Roster</h4>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+        ${window.currentPreviewTeam.map(o => `
+          <div style="display:flex; justify-content:space-between; align-items:center; background: var(--bg-secondary); padding: 8px 12px; border: 1px solid var(--border-light); border-radius: 4px; font-size:13px;">
+            <div><strong>${o.designation} ${o.name}</strong> <span style="color:var(--text-muted);font-size:11px">(${o.badge_number})</span></div>
+            <button onclick="removeOfficer(${o.id})" style="background:none; border:none; color:var(--danger); cursor:pointer;"><i class="fas fa-times"></i></button>
+          </div>
+        `).join('')}
+      </div>
+      <div style="display:flex; gap:8px;">
+        <select id="swapOfficerSelect" class="form-control" style="flex:1;">
+          <option value="">+ Add Available Officer</option>
+          ${window.availablePool.filter(o => !window.currentPreviewTeam.find(t => t.id === o.id)).map(o => `
+            <option value="${o.id}">${o.designation} ${o.name}</option>
+          `).join('')}
+        </select>
+        <button class="btn-sm btn-secondary" onclick="addOfficer()"><i class="fas fa-plus"></i></button>
+      </div>
     </div>
   `;
 
-  // 2. Build Dynamic CSS Map/Graph
-  let graphHtml = '';
-  if (wps.length > 0) {
-    let minLat = Math.min(...wps.map(w => w.lat));
-    let maxLat = Math.max(...wps.map(w => w.lat));
-    let minLng = Math.min(...wps.map(w => w.lng));
-    let maxLng = Math.max(...wps.map(w => w.lng));
+  // 2. Build Details UI
+  let detailsHtml = `
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; font-size: 13px;">
+      <div><strong>Shift:</strong> ${s.shift ? s.shift.toUpperCase() : 'N/A'}</div>
+      <div><strong>Metrics:</strong> ~${s.optimized_route.total_distance_km || 0} km</div>
+    </div>
+  `;
 
-    let latRange = (maxLat - minLat) || 0.01;
-    let lngRange = (maxLng - minLng) || 0.01;
+  // 3. ACTUAL MAP CONTAINER (Replaces the SVG graph)
+  let mapHtml = `
+    <div style="margin-bottom: 20px;">
+      <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Interactive Route Map</h4>
+      <div id="previewMap" style="width: 100%; height: 260px; border: 1px solid var(--border); border-radius: var(--radius); background: #eef2f6; z-index: 1;"></div>
+    </div>
+  `;
 
-    let pointsHtml = '';
-    let svgLines = '';
-    let prevX, prevY;
-
-    wps.forEach((w, i) => {
-      // Changed to 60 multiplier with a 20 offset to bring points inward and prevent clipping
-      let x = ((w.lng - minLng) / lngRange) * 60 + 20; 
-      let y = 100 - (((w.lat - minLat) / latRange) * 60 + 20); 
-
-      // Use an SVG line instead of CSS math - this perfectly connects the dots!
-      if (i > 0) {
-        svgLines += `<line x1="${prevX}%" y1="${prevY}%" x2="${x}%" y2="${y}%" stroke="var(--accent)" stroke-width="3" stroke-dasharray="6,4" opacity="0.5" />`;
-      }
-
-      pointsHtml += `
-        <div style="position:absolute; left:${x}%; top:${y}%; transform:translate(-50%, -50%); width:24px; height:24px; background:var(--accent); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; z-index:2; box-shadow:0 0 0 4px var(--accent-glow);" title="${w.zone_name || 'Zone'}">
-          ${i + 1}
-        </div>
-        <div style="position:absolute; left:${x}%; top:${y}%; transform:translate(-50%, 18px); font-size:10px; font-weight:500; white-space:nowrap; color:var(--text-secondary); background:var(--bg-secondary); padding:2px 6px; border-radius:4px; border: 1px solid var(--border); z-index:3; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-           ${w.zone_name || `Area ${w.area_id}`}
-        </div>
-      `;
-      
-      prevX = x;
-      prevY = y;
-    });
-
-    graphHtml = `
-      <div style="margin-bottom: 20px;">
-        <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Topological Route Graph</h4>
-        <!-- Increased height to 240px to give labels more room to breathe -->
-        <div style="position: relative; width: 100%; height: 240px; background: #eef2f6; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 20px 20px;">
-          <svg style="position: absolute; top:0; left:0; width:100%; height:100%; z-index:1;">
-            ${svgLines}
-          </svg>
-          ${pointsHtml}
-        </div>
-      </div>
-    `;
-  }
-
-  // 3. Build Timeline List
+  // 4. Build Timeline UI
   let timelineHtml = `
     <div>
-      <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Checkpoints & Timings</h4>
+      <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Route Checkpoints</h4>
       <div style="display:flex; flex-direction:column; gap:8px;">
         ${wps.map((w, i) => `
           <div style="display:flex; align-items:center; gap: 12px; font-size: 13px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);">
-            <div style="width:28px; height:28px; background:var(--bg-primary); color:var(--text-secondary); border: 1px solid var(--border); display:flex; align-items:center; justify-content:center; border-radius:50%; font-family: var(--font-display); font-weight:bold;">${i + 1}</div>
+            <div style="width:28px; height:28px; background:var(--bg-primary); color:var(--text-secondary); border: 1px solid var(--border); display:flex; align-items:center; justify-content:center; border-radius:50%; font-weight:bold;">${i + 1}</div>
             <div style="flex:1;">
-              <div style="font-weight:600; color:var(--text-primary);">${w.zone_name || `Area ${w.area_id}`}</div>
-              <div style="color:var(--text-muted); font-size: 11px;">Risk Score: <span style="color:var(--danger); font-weight: 600;">${w.risk_score || 'N/A'}</span></div>
-            </div>
-            <div style="text-align:right;">
-               <div style="color:var(--text-muted); font-size:11px;">ETA</div>
-               <div style="font-weight:600; color:var(--text-primary);">${w.estimated_arrival ? new Date(w.estimated_arrival).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '--:--'}</div>
+              <div style="font-weight:600;">${w.zone_name}</div>
+              <div style="color:var(--text-muted); font-size: 11px;">Risk Score: <span style="color:var(--danger);">${w.risk_score}</span></div>
             </div>
           </div>
         `).join('')}
@@ -350,16 +340,84 @@ window.previewSuggestion = function(index) {
     </div>
   `;
 
-  document.getElementById('previewModalBody').innerHTML = detailsHtml + graphHtml + timelineHtml;
-
-  const assignBtn = document.getElementById('previewAssignBtn');
-  assignBtn.onclick = () => {
-    closePreviewModal();
-    assignPatrolByIndex(index);
+  document.getElementById('previewModalBody').innerHTML = teamHtml + detailsHtml + mapHtml + timelineHtml;
+  
+  document.getElementById('previewAssignBtn').onclick = () => {
+    assignTeamPatrol(window.currentSuggestionIndex);
   };
 
-  document.getElementById('suggestionPreviewModal').classList.add('active');
+  // --- INITIALIZE LEAFLET MAP ---
+  // We use a slight timeout because Leaflet maps glitch out if initialized
+  // before their HTML container is fully visible on the screen.
+  setTimeout(() => {
+    // Destroy old map instance if it exists to prevent overlap errors
+    if (window.previewMapInstance) {
+      window.previewMapInstance.remove();
+    }
+
+    if (wps.length > 0) {
+      window.previewMapInstance = L.map('previewMap', { zoomControl: false }).setView([wps[0].lat, wps[0].lng], 14);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OSM'
+      }).addTo(window.previewMapInstance);
+
+      // Extract coordinates into Leaflet format
+      const latLngs = wps.map(w => L.latLng(w.lat, w.lng));
+
+      // Draw the street-aware route
+      L.Routing.control({
+        waypoints: latLngs,
+        router: L.Routing.osrmv1({
+          serviceUrl: 'https://router.project-osrm.org/route/v1'
+        }),
+        lineOptions: {
+          styles: [
+            { color: '#1e3799', weight: 8, opacity: 0.8 }, // Dark blue shadow
+            { color: '#00d4ff', weight: 4, opacity: 1, dashArray: '8, 6' } // Bright cyan dashed inner
+          ],
+          extendToWaypoints: true,
+          missingRouteTolerance: 0
+        },
+        show: false,          // Hide turn-by-turn text box
+        addWaypoints: false,  // Prevent dragging
+        fitSelectedRoutes: true, // Auto-zoom to fit the route perfectly!
+        createMarker: function(i, wp, nWps) {
+           return L.marker(wp.latLng, {
+             icon: L.divIcon({
+               html: `<div style="background:var(--accent);border:2px solid #fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:bold;box-shadow:0 0 10px var(--accent-glow)">${i + 1}</div>`,
+               iconSize: [24, 24],
+               iconAnchor: [12, 12]
+             })
+           });
+        }
+      }).addTo(window.previewMapInstance);
+    }
+  }, 50); 
 };
+
+// UI Swap Functions
+window.removeOfficer = function(id) {
+  window.currentPreviewTeam = window.currentPreviewTeam.filter(o => o.id !== id);
+  renderPreviewModal();
+};
+
+window.addOfficer = function() {
+  const select = document.getElementById('swapOfficerSelect');
+  const id = parseInt(select.value);
+  if (!id) return;
+  
+  const officer = window.availablePool.find(o => o.id === id);
+  if (officer && !window.currentPreviewTeam.find(o => o.id === id)) {
+    window.currentPreviewTeam.push(officer);
+    renderPreviewModal();
+  }
+};
+
+function assignPatrolByIndex(index) {
+  const suggestion = window.suggestionsData[index];
+  assignPatrol(suggestion);
+}
 
 window.closePreviewModal = function() {
   document.getElementById('suggestionPreviewModal').classList.remove('active');
