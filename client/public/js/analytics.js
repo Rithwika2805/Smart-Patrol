@@ -153,9 +153,20 @@ async function loadZones() {
     (res.data || []).forEach(h => {
       sel.innerHTML += `<option value="${h.id}">${h.zone_name} (Risk: ${h.risk_score})</option>`;
     });
+
+    // --- NEW: Populate the Hour of Day dropdown ---
+    const hourSel = document.getElementById('predictHour');
+    hourSel.innerHTML = '';
+    for (let i = 0; i < 24; i++) {
+      const hourText = String(i).padStart(2, '0') + ':00';
+      hourSel.innerHTML += `<option value="${i}">${hourText}</option>`;
+    }
+
     // Default hour to current
-    document.getElementById('predictHour').value = new Date().getHours();
-  } catch {}
+    hourSel.value = new Date().getHours();
+  } catch (err) {
+    console.error("Error loading zones/hours:", err);
+  }
 }
 
 async function runPrediction() {

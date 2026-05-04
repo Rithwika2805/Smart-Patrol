@@ -62,6 +62,11 @@ const API = {
     create: (data) => API.post('/patrols', data),
     updateStatus: (id, data) => API.put(`/patrols/${id}/status`, data),
     suggest: () => API.post('/patrols/suggest', {})
+  },
+
+  stations: {
+    getAll: (params = '') => API.get(`/stations${params}`),
+    getById: (id) => API.get(`/stations/${id}`)
   }
 };
 

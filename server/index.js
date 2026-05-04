@@ -3,10 +3,6 @@ const cors = require('cors');
 const path = require('path');
 const db = require('./db');
 
-const crimeRoutes = require('./routes/crimeRoutes');
-const officerRoutes = require('./routes/officerRoutes');
-const patrolRoutes = require('./routes/patrolRoutes');
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -15,9 +11,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../client/public')));
 
 // Routes
-app.use('/api/crimes', crimeRoutes);
-app.use('/api/officers', officerRoutes);
-app.use('/api/patrols', patrolRoutes);
+app.use('/api/crimes', require('./routes/crimeRoutes'));
+app.use('/api/officers', require('./routes/officerRoutes'));
+app.use('/api/patrols', require('./routes/patrolRoutes'));
+app.use('/api/stations', require('./routes/stationRoutes'));
 
 // Health check
 app.get('/api/health', (req, res) => {
