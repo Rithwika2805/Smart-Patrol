@@ -7,14 +7,12 @@ exports.generateSmartSuggestions = async (timeframe = 'current') => {
   let baseDate = new Date();
   let currentShift;
   let targetHour = baseDate.getHours();
-  let targetDay = baseDate.getDay() + 1; // MySQL DAYOFWEEK is 1=Sun, 2=Mon...
+  let targetDay = baseDate.getDay() + 1;
 
-  // 1. Calculate Target Time & Shift
   if (timeframe === 'current') {
     currentShift = targetHour >= 6 && targetHour < 14 ? 'morning'
       : targetHour >= 14 && targetHour < 22 ? 'evening' : 'night';
   } else {
-    // Time travel to tomorrow
     baseDate.setDate(baseDate.getDate() + 1);
     targetDay = baseDate.getDay() + 1;
     currentShift = timeframe.replace('tomorrow_', ''); 
@@ -41,7 +39,7 @@ exports.generateSmartSuggestions = async (timeframe = 'current') => {
   
   const activeZoneIds = new Set(activePatrols.map(p => p.area_id).filter(id => id != null));
 
-  // 🌟 THE MAGIC: Dynamic Risk Query based on Target Hour and Day
+  // Dynamic Risk Query based on Target Hour and Day
   const [allHotspots] = await db.query(`
     SELECT h.*, 
            COUNT(DISTINCT c1.id) as recent_crimes,
@@ -56,20 +54,17 @@ exports.generateSmartSuggestions = async (timeframe = 'current') => {
     GROUP BY h.id
   `, [targetHour, targetDay]);
 
-  // 🌟 Calculate dynamic risk for the specific time requested
   let dynamicZones = allHotspots.map(h => {
     let adjustedScore = h.risk_score || 50;
     
-    // Boost the score if this zone has a history of crime AT THIS SPECIFIC TIME
     if (h.time_crimes > 0) {
       adjustedScore += (h.time_crimes * 2) + ((h.time_high_crimes || 0) * 5);
     }
     
     return { 
       ...h, 
-      // Override the static score with our new time-traveling dynamic one
       risk_score: Math.min(100, Math.round(adjustedScore)),
-      original_score: h.risk_score // Keep the old one just in case
+      original_score: h.risk_score
     };
   }).sort((a, b) => b.risk_score - a.risk_score);
 
@@ -112,7 +107,6 @@ exports.generateSmartSuggestions = async (timeframe = 'current') => {
     const targetTeamSize = priority === 'HIGH' ? 3 : 2;
     let team = [];
     
-    // 🌟 Set the exact patrol time based on what they selected in the dropdown
     let selectedStartTime = new Date(baseDate);
     if (timeframe !== 'current') {
       selectedStartTime.setHours(targetHour, 0, 0, 0);

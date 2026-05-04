@@ -17,7 +17,7 @@ async function loadPatrols() {
       return;
     }
 
-    // 1. Group patrols by route and time to combine teams into single rows
+    // Group patrols by route and time to combine teams into single rows
     const groupedMap = new Map();
     rawPatrols.forEach(p => {
       const key = `${p.start_time}_${p.end_time}_${p.status}`;
@@ -25,13 +25,12 @@ async function loadPatrols() {
         groupedMap.set(key, { ...p, team: [], patrol_ids: [] });
       }
       const group = groupedMap.get(key);
-      group.team.push(p.officer_name.split(' ')[0]); // Extract first names
-      group.patrol_ids.push(p.id); // Save all IDs so actions apply to the whole team
+      group.team.push(p.officer_name.split(' ')[0]);
+      group.patrol_ids.push(p.id);
     });
     
     const patrols = Array.from(groupedMap.values());
 
-    // 2. Render the grouped data
     wrap.innerHTML = `
       <div style="overflow-x:auto">
         <table class="data-table">
@@ -146,11 +145,9 @@ async function viewPatrol(id) {
     const wps = p.waypoints || [];
     const team = p.team || [{ name: p.officer_name, designation: p.designation, badge_number: p.badge_number }];
     
-    // Parse the JSON string stored in the database to extract the distance/duration
     let routeData = {};
     try { routeData = typeof p.route_data === 'string' ? JSON.parse(p.route_data) : p.route_data; } catch(e) {}
 
-    // 1. Build Team Roster UI
     let teamHtml = `
       <div style="margin-bottom: 20px; background: var(--bg-primary); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
         <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Team Roster</h4>
@@ -164,7 +161,6 @@ async function viewPatrol(id) {
       </div>
     `;
 
-    // 2. Build Details Header
     let detailsHtml = `
       <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; font-size: 13px;">
         <div><strong>Start:</strong> <span style="color:var(--text-primary)">${p.start_time ? fmtDate(p.start_time) : '—'}</span></div>
@@ -175,7 +171,7 @@ async function viewPatrol(id) {
       ${p.notes ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic;margin-bottom:20px;">${p.notes}</div>` : ''}
     `;
 
-    // 3. Build Dynamic Topological Graph
+    // Dynamic Topological Graph
     let graphHtml = '';
     if (wps.length > 0) {
       let minLat = Math.min(...wps.map(w => w.lat));
@@ -198,7 +194,6 @@ async function viewPatrol(id) {
           svgLines += `<line x1="${prevX}%" y1="${prevY}%" x2="${x}%" y2="${y}%" stroke="var(--accent)" stroke-width="3" stroke-dasharray="6,4" opacity="0.5" />`;
         }
 
-        // Change color to green if the waypoint has been reached!
         const nodeColor = w.status === 'reached' ? 'var(--success)' : 'var(--accent)';
         const glowColor = w.status === 'reached' ? 'var(--success-dim)' : 'var(--accent-glow)';
 
@@ -226,7 +221,6 @@ async function viewPatrol(id) {
       `;
     }
 
-    // 4. Build Timeline List
     let timelineHtml = `
       <div>
         <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Waypoints</h4>
@@ -269,7 +263,6 @@ async function updateWaypoint(id, status) {
 
     showToast(`Zone marked as ${status}`, 'success');
 
-    // reload modal
     const modal = document.getElementById('patrolDetailModal');
     const patrolId = modal.getAttribute('data-id');
 
@@ -279,42 +272,33 @@ async function updateWaypoint(id, status) {
   }
 }
 
-// Global variable to store the action waiting for confirmation
 let pendingAction = null;
 
-// The new updateStatus function that triggers the modal instead of native confirm
 function updateStatus(idsString, status) {
   const labels = { active: 'Start', completed: 'Complete', cancelled: 'Cancel' };
   const actionWord = labels[status] || 'Update';
   
-  // Set modal text dynamically
   document.getElementById('confirmTitle').textContent = `${actionWord} Patrol`;
   document.getElementById('confirmMessage').textContent = `Are you sure you want to ${actionWord.toLowerCase()} this patrol?`;
   
-  // Store the data so the confirm button knows what to do
   pendingAction = { idsString, status };
   
-  // Show the modal
   document.getElementById('confirmModal').classList.add('active');
 }
 
-// Function to close the modal
 function closeConfirm() {
   document.getElementById('confirmModal').classList.remove('active');
   pendingAction = null;
 }
 
-// Event listener for the actual confirmation button inside the modal
 document.getElementById('confirmBtn').addEventListener('click', async () => {
   if (!pendingAction) return;
   
   const { idsString, status } = pendingAction;
   
-  // Close the modal immediately so the UI feels snappy
   closeConfirm(); 
 
   try {
-    // Execute the API calls for the team
     const ids = String(idsString).split(',');
     await Promise.all(ids.map(id => API.patrols.updateStatus(id, { status })));
     

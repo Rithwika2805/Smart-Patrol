@@ -5,13 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Secure Login — Patrol-AI</title>
   
-  <!-- Use your existing stylesheet -->
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet">
   
   <style>
-    /* Specific styles to center the login screen */
     body {
       display: flex;
       align-items: center;
@@ -104,7 +102,6 @@
   </div>
 
   <script>
-    // Automatically focus the username field on page load
     document.getElementById('username').focus();
 
     async function handleLogin() {
@@ -121,7 +118,6 @@
         return;
       }
 
-      // Visual feedback while waiting for the server
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
       btn.disabled = true;
       errorDiv.style.display = 'none';
@@ -136,10 +132,8 @@
         const data = await res.json();
 
         if (data.success) {
-          // Save the JWT token securely in localStorage
           localStorage.setItem('token', data.token);
           
-          // Show a quick success state before redirecting
           btn.innerHTML = '<i class="fas fa-check"></i> Access Granted';
           btn.style.backgroundColor = 'var(--success)';
           btn.style.borderColor = 'var(--success)';
@@ -149,7 +143,6 @@
           }, 600);
 
         } else {
-          // Display the error from the backend
           showError(data.error || 'Invalid credentials');
           resetButton();
         }
@@ -171,7 +164,6 @@
       btn.disabled = false;
     }
 
-    // Allow pressing "Enter" anywhere to submit the form
     document.addEventListener('keypress', function (e) {
       if (e.key === 'Enter') {
         handleLogin();

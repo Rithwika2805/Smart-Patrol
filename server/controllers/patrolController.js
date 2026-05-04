@@ -33,7 +33,7 @@ exports.getPatrolById = async (req, res) => {
     );
     if (!patrol.length) return res.status(404).json({ success: false, error: 'Patrol not found' });
 
-    // 1. Join hotspots to get the actual zone_name and risk_score
+    // Join hotspots to get the actual zone_name and risk_score
     const [waypoints] = await db.query(
       `SELECT pw.*, h.zone_name, h.risk_score
        FROM patrol_waypoints pw 
@@ -42,7 +42,6 @@ exports.getPatrolById = async (req, res) => {
       [req.params.id]
     );
 
-    // 2. Fetch team members by finding officers assigned to identical shifts
     const [team] = await db.query(
       `SELECT o.id, o.name, o.designation, o.badge_number 
        FROM patrols p 
@@ -62,7 +61,6 @@ exports.createPatrol = async (req, res) => {
   try {
     const { area_ids, start_time, end_time, notes } = req.body;
     
-    // Backwards compatible: Handle both single officer_id or array of officer_ids
     let targetOfficers = [];
     if (req.body.officer_ids) targetOfficers = req.body.officer_ids;
     else if (req.body.officer_id) targetOfficers = [req.body.officer_id];
@@ -80,14 +78,12 @@ exports.createPatrol = async (req, res) => {
     const formattedStart = formatDateTime(start_time);
     const formattedEnd = formatDateTime(end_time);
 
-    // Generate optimized route ONCE for the whole team
     const optimizedRoute = await routeService.generateOptimizedRoute(area_ids);
     const insertedPatrolIds = [];
 
-    // Loop through team and assign them all the exact same route
     for (let officer_id of targetOfficers) {
       const isAvailable = await officerService.isOfficerAvailable(officer_id, formattedStart, formattedEnd);
-      if (!isAvailable) continue; // Skip if this specific officer got busy
+      if (!isAvailable) continue;
 
       const [result] = await db.query(
         `INSERT INTO patrols (officer_id, route_data, start_time, end_time, status, notes, created_at)
@@ -124,7 +120,6 @@ exports.updateWaypointStatus = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid status' });
     }
 
-    // 1️⃣ Get waypoint details
     const [[wp]] = await db.query(
       `SELECT patrol_id, lat, lng 
        FROM patrol_waypoints 
@@ -136,7 +131,6 @@ exports.updateWaypointStatus = async (req, res) => {
       return res.status(404).json({ success: false, error: 'Waypoint not found' });
     }
 
-    // 2️⃣ Update waypoint status
     await db.query(
       `UPDATE patrol_waypoints 
        SET status = ? 
@@ -144,7 +138,6 @@ exports.updateWaypointStatus = async (req, res) => {
       [status, waypoint_id]
     );
 
-    // 3️⃣ If reached → update patrol location 🔥
     if (status === 'reached') {
       await db.query(
         `UPDATE patrols 

@@ -15,7 +15,6 @@ async function loadOfficers() {
     const res = await API.officers.getAll(params);
     const officers = res.data || [];
 
-    // Summary
     const available = officers.filter(o => o.status === 'available').length;
     const onDuty = officers.filter(o => o.status === 'on_duty').length;
     const offDuty = officers.filter(o => o.status === 'off_duty').length;
@@ -133,35 +132,27 @@ async function saveOfficer() {
   }
 }
 
-// Global variable to store the officer ID waiting for deletion
 let pendingDeleteId = null;
 
-// The updated deleteOfficer function that triggers the modal
 function deleteOfficer(id, name) {
-  // Set modal text dynamically
   document.getElementById('confirmTitle').textContent = 'Remove Officer';
   document.getElementById('confirmMessage').textContent = `Are you sure you want to remove officer "${name}" from the system?`;
   
-  // Store the ID so the confirm button knows what to delete
   pendingDeleteId = id;
   
-  // Show the modal
   document.getElementById('confirmModal').classList.add('active');
 }
 
-// Function to close the modal
 function closeConfirm() {
   document.getElementById('confirmModal').classList.remove('active');
   pendingDeleteId = null;
 }
 
-// Event listener for the actual confirmation button inside the modal
 document.getElementById('confirmBtn').addEventListener('click', async () => {
   if (!pendingDeleteId) return;
   
   const idToDel = pendingDeleteId;
   
-  // Close the modal immediately
   closeConfirm(); 
 
   try {

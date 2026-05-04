@@ -197,7 +197,7 @@ exports.predictRisk = async (req, res) => {
   }
 };
 
-// Helper: Update hotspot risk score
+// Update hotspot risk score
 async function updateHotspotRisk(areaId) {
   try {
     const [recent] = await db.query(

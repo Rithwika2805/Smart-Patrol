@@ -1,16 +1,14 @@
 const API_BASE = 'http://localhost:5000/api';
 
-// Helper to get the JWT token
+// JWT token
 const getToken = () => localStorage.getItem('token');
 
-// Core request handler with built-in JWT Authentication
 const request = async (endpoint, options = {}) => {
   const headers = {
     'Content-Type': 'application/json',
     ...options.headers
   };
 
-  // If a token exists, attach it to the Authorization header
   const token = getToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
@@ -19,7 +17,6 @@ const request = async (endpoint, options = {}) => {
   try {
     const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
     
-    // If unauthorized or forbidden, clear the bad token and kick to login
     if (res.status === 401 || res.status === 403) {
       localStorage.removeItem('token');
       window.location.href = 'login.html';
@@ -35,7 +32,6 @@ const request = async (endpoint, options = {}) => {
 };
 
 const API = {
-  // Use the new request handler for all methods
   get: (endpoint) => request(endpoint),
   
   post: (endpoint, data) => request(endpoint, { 
@@ -52,7 +48,6 @@ const API = {
     method: 'DELETE' 
   }),
 
-  // Endpoints
   crimes: {
     getAll: (params = '') => API.get(`/crimes${params}`),
     getById: (id) => API.get(`/crimes/${id}`),
@@ -89,7 +84,7 @@ const API = {
   }
 };
 
-// ── TOAST NOTIFICATIONS ──
+// TOAST NOTIFICATIONS 
 function showToast(message, type = 'info') {
   let container = document.querySelector('.toast-container');
   if (!container) {
@@ -112,7 +107,7 @@ function showToast(message, type = 'info') {
   }, 3500);
 }
 
-// ── DATETIME ──
+// DATETIME
 function updateDatetime() {
   const el = document.getElementById('datetime');
   if (!el) return;
@@ -126,7 +121,7 @@ function updateDatetime() {
 setInterval(updateDatetime, 1000);
 updateDatetime();
 
-// ── SIDEBAR TOGGLE ──
+// SIDEBAR TOGGLE
 document.addEventListener('DOMContentLoaded', () => {
   const toggle = document.getElementById('sidebarToggle');
   const sidebar = document.getElementById('sidebar');
@@ -138,7 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-// ── RISK COLOR HELPER ──
+// RISK COLOR HELPER
 function getRiskClass(score) {
   if (score >= 90) return 'risk-critical';
   if (score >= 70) return 'risk-high';
@@ -161,15 +156,12 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-// ── SECURE LOGOUT ──
+// SECURE LOGOUT
 function logout() {
-  // Remove the JWT token from the browser
   localStorage.removeItem('token');
   
-  // Show a quick toast (optional, but looks nice)
   showToast('Logging out...', 'info');
   
-  // Redirect to the login page after a tiny delay
   setTimeout(() => {
     window.location.href = 'login.html';
   }, 500);

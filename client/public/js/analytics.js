@@ -67,7 +67,6 @@ function drawHourChart(data) {
   const labels = data.map(d => `${d.hour}:00`);
   const values = data.map(d => d.count);
 
-  // Highlight night hours
   const bgColors = labels.map((_, i) => {
     const h = parseInt(data[i]?.hour || 0);
     return (h >= 20 || h <= 5) ? 'rgba(255,71,87,0.5)' : 'rgba(0,212,255,0.3)';
@@ -161,7 +160,6 @@ async function loadZones() {
       sel.innerHTML += `<option value="${h.id}">${h.zone_name} (Risk: ${h.risk_score})</option>`;
     });
 
-    // --- NEW: Populate the Hour of Day dropdown ---
     const hourSel = document.getElementById('predictHour');
     hourSel.innerHTML = '';
     for (let i = 0; i < 24; i++) {

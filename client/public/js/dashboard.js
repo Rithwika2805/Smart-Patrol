@@ -28,12 +28,10 @@ async function loadStats() {
     document.getElementById('statOnDuty').textContent = onDuty;
     document.getElementById('statAvailable').textContent = `${available} available`;
 
-    // FIX: Count unique active team patrols instead of raw records
     const activeData = patrolRes.data || [];
     const uniqueActive = new Set(activeData.map(p => `${p.start_time}_${p.end_time}`)).size;
     document.getElementById('statActivePatrols').textContent = uniqueActive;
 
-    // FIX: Count unique scheduled team patrols instead of raw records
     const allPatrols = await API.patrols.getAll('?status=scheduled');
     const scheduledData = allPatrols.data || [];
     const uniqueScheduled = new Set(scheduledData.map(p => `${p.start_time}_${p.end_time}`)).size;
@@ -248,7 +246,6 @@ async function loadPatrolSuggestions() {
 async function assignTeamPatrol(index) {
   const s = window.suggestionsData[index];
   
-  // Only use the modal's modified team if the modal is currently open and modifying THIS suggestion
   const isModalOpen = document.getElementById('suggestionPreviewModal').classList.contains('active');
   const teamIds = (isModalOpen && window.currentSuggestionIndex === index) 
     ? window.currentPreviewTeam.map(o => o.id) 
@@ -272,7 +269,6 @@ async function assignTeamPatrol(index) {
   }
 }
 
-// Global state for the preview modal
 window.currentPreviewTeam = [];
 window.availablePool = [];
 window.currentSuggestionIndex = null;
@@ -294,7 +290,6 @@ window.renderPreviewModal = function() {
   const s = window.suggestionsData[window.currentSuggestionIndex];
   const wps = s.optimized_route.waypoints || [];
 
-  // 1. Build Team Roster UI
   let teamHtml = `
     <div style="margin-bottom: 20px; background: var(--bg-primary); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
       <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Team Roster</h4>
@@ -318,7 +313,6 @@ window.renderPreviewModal = function() {
     </div>
   `;
 
-  // 2. Build Details UI
   let detailsHtml = `
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; font-size: 13px;">
       <div><strong>Shift:</strong> ${s.shift ? s.shift.toUpperCase() : 'N/A'}</div>
@@ -326,7 +320,6 @@ window.renderPreviewModal = function() {
     </div>
   `;
 
-  // 3. ACTUAL MAP CONTAINER (Replaces the SVG graph)
   let mapHtml = `
     <div style="margin-bottom: 20px;">
       <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Interactive Route Map</h4>
@@ -334,7 +327,6 @@ window.renderPreviewModal = function() {
     </div>
   `;
 
-  // 4. Build Timeline UI
   let timelineHtml = `
     <div>
       <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Route Checkpoints</h4>
@@ -358,11 +350,10 @@ window.renderPreviewModal = function() {
     assignTeamPatrol(window.currentSuggestionIndex);
   };
 
-  // --- INITIALIZE LEAFLET MAP ---
+  // INITIALIZE LEAFLET MAP
   // We use a slight timeout because Leaflet maps glitch out if initialized
   // before their HTML container is fully visible on the screen.
   setTimeout(() => {
-    // Destroy old map instance if it exists to prevent overlap errors
     if (window.previewMapInstance) {
       window.previewMapInstance.remove();
     }
@@ -374,10 +365,8 @@ window.renderPreviewModal = function() {
         attribution: '© OSM'
       }).addTo(window.previewMapInstance);
 
-      // Extract coordinates into Leaflet format
       const latLngs = wps.map(w => L.latLng(w.lat, w.lng));
 
-      // Draw the street-aware route
       L.Routing.control({
         waypoints: latLngs,
         router: L.Routing.osrmv1({
@@ -408,7 +397,6 @@ window.renderPreviewModal = function() {
   }, 50); 
 };
 
-// UI Swap Functions
 window.removeOfficer = function(id) {
   window.currentPreviewTeam = window.currentPreviewTeam.filter(o => o.id !== id);
   renderPreviewModal();
@@ -440,5 +428,4 @@ function refreshDashboard() {
   showToast('Dashboard refreshed', 'info');
 }
 
-// Init
 document.addEventListener('DOMContentLoaded', loadDashboard);

@@ -3,7 +3,6 @@ const layers = { hotspots: null, crimes: null, patrols: null };
 const layerGroups = { hotspots: [], crimes: [], patrols: [], stations: [] };
 
 function initMap() {
-  // Center on Prayagraj
   map = L.map('map', { zoomControl: false }).setView([25.4358, 81.8463], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -28,10 +27,8 @@ async function loadHotspots() {
       
       const color = h.risk_score >= 90 ? '#ff4757' : h.risk_score >= 70 ? '#ffa502' : h.risk_score >= 45 ? '#00d4ff' : '#2ed573';
       
-      // Use the radius from the database, or default to 500 meters if it's missing
       const radiusInMeters = h.radius_meters || 500;
 
-      // Changed from L.circleMarker to L.circle
       const circle = L.circle([h.lat, h.lng], {
         radius: radiusInMeters, 
         fillColor: color,
@@ -58,12 +55,10 @@ async function loadHotspots() {
   }
 }
 
-// 🚔 UPDATED: Load Police Stations from Database
 async function loadStations() {
   clearLayer('stations');
 
   try {
-    // Fetch from your actual database via the API
     const res = await API.stations.getAll();
     const stations = res.data || [];
 
@@ -127,16 +122,13 @@ async function loadActivePatrols() {
     const res = await API.patrols.getActive();
     const patrols = res.data || [];
 
-    // 🌟 THE FIX 1: Create a palette of highly distinct, neon UI colors
     const teamColors = ['#00d4ff', '#ff4757', '#2ed573', '#ffa502', '#e056fd', '#ff9f43', '#10ac84'];
     let colorIndex = 0;
 
     for (const p of patrols) {
-      // 🌟 THE FIX 2: Pick a unique color for this specific patrol team
       const routeColor = teamColors[colorIndex % teamColors.length];
       colorIndex++;
 
-      // Fetch waypoints FIRST to establish a fallback location
       let wps = [];
       try {
         const detailRes = await API.patrols.getById(p.id);
@@ -145,13 +137,11 @@ async function loadActivePatrols() {
         console.warn('Could not fetch route details for patrol id:', p.id);
       }
 
-      // Fallback to the first waypoint if current_lat is null
       const startLat = p.current_lat || (wps[0] ? wps[0].lat : null);
       const startLng = p.current_lng || (wps[0] ? wps[0].lng : null);
 
       if (!startLat || !startLng) continue;
 
-      // 🌟 THE FIX 3: Inject the dynamic routeColor into the Officer's Marker and Glow!
       const officerIcon = L.divIcon({
         html: `<div style="background:${routeColor};border:2px solid #fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:bold;box-shadow:0 0 10px ${routeColor}80">${p.officer_name.charAt(0)}</div>`,
         iconSize: [24, 24],
@@ -169,7 +159,6 @@ async function loadActivePatrols() {
       marker.addTo(map);
       layerGroups.patrols.push(marker);
 
-      // 2. Draw the Route Line
       if (wps.length > 0) {
         const pendingWps = wps.filter(w => w.status !== 'reached' && w.status !== 'skipped');
         
@@ -185,10 +174,9 @@ async function loadActivePatrols() {
               serviceUrl: 'https://router.project-osrm.org/route/v1'
             }),
             lineOptions: {
-              // 🌟 THE FIX 4: Apply the dynamic color to the dashed line
               styles: [
-                { color: '#1a1a2e', weight: 8, opacity: 0.7 }, // Generic dark shadow for contrast
-                { color: routeColor, weight: 4, opacity: 1, dashArray: '8, 6' } // Distinct team color
+                { color: '#1a1a2e', weight: 8, opacity: 0.7 },
+                { color: routeColor, weight: 4, opacity: 1, dashArray: '8, 6' }
               ],
               extendToWaypoints: true,
               missingRouteTolerance: 0
