@@ -133,15 +133,44 @@ async function saveOfficer() {
   }
 }
 
-async function deleteOfficer(id, name) {
-  if (!confirm(`Remove officer "${name}" from the system?`)) return;
+// Global variable to store the officer ID waiting for deletion
+let pendingDeleteId = null;
+
+// The updated deleteOfficer function that triggers the modal
+function deleteOfficer(id, name) {
+  // Set modal text dynamically
+  document.getElementById('confirmTitle').textContent = 'Remove Officer';
+  document.getElementById('confirmMessage').textContent = `Are you sure you want to remove officer "${name}" from the system?`;
+  
+  // Store the ID so the confirm button knows what to delete
+  pendingDeleteId = id;
+  
+  // Show the modal
+  document.getElementById('confirmModal').classList.add('active');
+}
+
+// Function to close the modal
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.remove('active');
+  pendingDeleteId = null;
+}
+
+// Event listener for the actual confirmation button inside the modal
+document.getElementById('confirmBtn').addEventListener('click', async () => {
+  if (!pendingDeleteId) return;
+  
+  const idToDel = pendingDeleteId;
+  
+  // Close the modal immediately
+  closeConfirm(); 
+
   try {
-    await API.officers.delete(id);
+    await API.officers.delete(idToDel);
     showToast('Officer removed', 'success');
     loadOfficers();
   } catch {
     showToast('Cannot delete officer on active patrol', 'error');
   }
-}
+});
 
 document.addEventListener('DOMContentLoaded', loadOfficers);

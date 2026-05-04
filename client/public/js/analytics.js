@@ -126,20 +126,27 @@ function drawOfficerPerf(data) {
   const el = document.getElementById('officerPerf');
   if (!data.length) { el.innerHTML = '<div class="empty-state"><p>No data</p></div>'; return; }
 
-  const max = Math.max(...data.map(d => d.total_patrols));
-  el.innerHTML = data.map((o, i) => `
+  // 1. Sort the data: primarily by 'completed' (descending), then 'total_patrols' as a tie-breaker
+  const sortedData = [...data].sort((a, b) => b.completed - a.completed || b.total_patrols - a.total_patrols);
+
+  // 2. Base the progress bar width on the highest number of COMPLETED patrols
+  const maxCompleted = Math.max(...sortedData.map(d => d.completed));
+
+  el.innerHTML = sortedData.map((o, i) => `
     <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
       <div style="width:24px;text-align:center;font-size:11px;color:var(--text-muted);font-family:var(--font-display)">${i+1}</div>
       <div style="width:32px;height:32px;background:var(--accent-glow);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-family:var(--font-display);color:var(--accent)">${o.name.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
       <div style="flex:1">
         <div style="font-size:12px;font-weight:500;color:var(--text-primary)">${o.name}</div>
         <div style="margin-top:4px;background:var(--border);border-radius:2px;height:4px;overflow:hidden">
-          <div style="width:${max>0?(o.total_patrols/max*100):0}%;height:100%;background:var(--accent);border-radius:2px"></div>
+          <!-- The bar now reflects completions -->
+          <div style="width:${maxCompleted > 0 ? (o.completed / maxCompleted * 100) : 0}%;height:100%;background:var(--success);border-radius:2px"></div>
         </div>
       </div>
       <div style="text-align:right;font-size:11px">
-        <div style="color:var(--text-primary);font-family:var(--font-display)">${o.total_patrols}</div>
-        <div style="color:var(--success)">${o.completed} done</div>
+        <!-- Swapped the emphasis so 'done' is the main metric -->
+        <div style="color:var(--success);font-family:var(--font-display);font-weight:bold;font-size:12px">${o.completed} done</div>
+        <div style="color:var(--text-muted)">${o.total_patrols} assigned</div>
       </div>
     </div>
   `).join('');

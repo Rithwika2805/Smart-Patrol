@@ -28,11 +28,16 @@ async function loadStats() {
     document.getElementById('statOnDuty').textContent = onDuty;
     document.getElementById('statAvailable').textContent = `${available} available`;
 
-    const activePatrols = patrolRes.data?.length || 0;
-    document.getElementById('statActivePatrols').textContent = activePatrols;
+    // FIX: Count unique active team patrols instead of raw records
+    const activeData = patrolRes.data || [];
+    const uniqueActive = new Set(activeData.map(p => `${p.start_time}_${p.end_time}`)).size;
+    document.getElementById('statActivePatrols').textContent = uniqueActive;
 
+    // FIX: Count unique scheduled team patrols instead of raw records
     const allPatrols = await API.patrols.getAll('?status=scheduled');
-    document.getElementById('statScheduled').textContent = `${allPatrols.data?.length || 0} scheduled`;
+    const scheduledData = allPatrols.data || [];
+    const uniqueScheduled = new Set(scheduledData.map(p => `${p.start_time}_${p.end_time}`)).size;
+    document.getElementById('statScheduled').textContent = `${uniqueScheduled} scheduled`;
 
     const highRisk = (hotspotRes.data || []).filter(h => h.risk_score >= 70).length;
     document.getElementById('statHighRisk').textContent = highRisk;
@@ -379,9 +384,9 @@ window.renderPreviewModal = function() {
           extendToWaypoints: true,
           missingRouteTolerance: 0
         },
-        show: false,          // Hide turn-by-turn text box
-        addWaypoints: false,  // Prevent dragging
-        fitSelectedRoutes: true, // Auto-zoom to fit the route perfectly!
+        show: false,
+        addWaypoints: false,
+        fitSelectedRoutes: true,
         createMarker: function(i, wp, nWps) {
            return L.marker(wp.latLng, {
              icon: L.divIcon({

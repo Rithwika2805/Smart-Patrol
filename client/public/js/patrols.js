@@ -10,43 +10,62 @@ async function loadPatrols() {
 
   try {
     const res = await API.patrols.getAll(params);
-    const patrols = res.data || [];
+    const rawPatrols = res.data || [];
 
-    if (!patrols.length) {
+    if (!rawPatrols.length) {
       wrap.innerHTML = '<div class="empty-state" style="padding:60px"><i class="fas fa-route"></i><p>No patrols found</p></div>';
       return;
     }
 
+    // 1. Group patrols by route and time to combine teams into single rows
+    const groupedMap = new Map();
+    rawPatrols.forEach(p => {
+      const key = `${p.start_time}_${p.end_time}_${p.status}`;
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, { ...p, team: [], patrol_ids: [] });
+      }
+      const group = groupedMap.get(key);
+      group.team.push(p.officer_name.split(' ')[0]); // Extract first names
+      group.patrol_ids.push(p.id); // Save all IDs so actions apply to the whole team
+    });
+    
+    const patrols = Array.from(groupedMap.values());
+
+    // 2. Render the grouped data
     wrap.innerHTML = `
       <div style="overflow-x:auto">
         <table class="data-table">
           <thead>
             <tr>
-              <th>#</th><th>Officer</th><th>Designation</th><th>Status</th>
+              <th>#</th><th>Officer / Team</th><th>Designation</th><th>Status</th>
               <th>Start Time</th><th>End Time</th><th>Notes</th><th>Actions</th>
             </tr>
           </thead>
           <tbody>
             ${patrols.map(p => `
               <tr>
-                <td style="color:var(--text-muted)">${p.id}</td>
-                <td class="bold">${p.officer_name}</td>
-                <td style="font-size:12px;color:var(--accent)">${p.designation}</td>
+                <td style="color:var(--text-muted)">${p.patrol_ids[0]}</td>
+                <td class="bold">
+                  ${p.team.length > 1 
+                    ? `Team (${p.team.length}) <div style="font-size:11px;font-weight:normal;color:var(--text-muted)">${p.team.join(', ')}</div>` 
+                    : p.officer_name}
+                </td>
+                <td style="font-size:12px;color:var(--accent)">${p.team.length > 1 ? 'Team Patrol' : p.designation}</td>
                 <td><span class="status-badge status-${p.status}">${p.status}</span></td>
                 <td style="font-size:12px">${p.start_time ? fmtDate(p.start_time) : '—'}</td>
                 <td style="font-size:12px">${p.end_time ? fmtDate(p.end_time) : '—'}</td>
                 <td style="font-size:11px;color:var(--text-muted);max-width:140px;overflow:hidden;text-overflow:ellipsis">${p.notes || '—'}</td>
                 <td>
                   <div style="display:flex;gap:6px">
-                    <button class="btn-sm btn-secondary" style="padding:4px 8px" onclick="viewPatrol(${p.id})" title="View Route"><i class="fas fa-eye"></i></button>
+                    <button class="btn-sm btn-secondary" style="padding:4px 8px" onclick="viewPatrol(${p.patrol_ids[0]})" title="View Route"><i class="fas fa-eye"></i></button>
                     ${p.status === 'scheduled' ? `
-                      <button class="btn-sm btn-primary" style="padding:4px 8px" onclick="updateStatus(${p.id},'active')" title="Start Patrol"><i class="fas fa-play"></i></button>
+                      <button class="btn-sm btn-primary" style="padding:4px 8px" onclick="updateStatus('${p.patrol_ids.join(',')}', 'active')" title="Start Patrol"><i class="fas fa-play"></i></button>
                     ` : ''}
                     ${p.status === 'active' ? `
-                      <button class="btn-sm btn-secondary" style="padding:4px 8px;border-color:var(--success);color:var(--success)" onclick="updateStatus(${p.id},'completed')" title="Complete"><i class="fas fa-check"></i></button>
+                      <button class="btn-sm btn-secondary" style="padding:4px 8px;border-color:var(--success);color:var(--success)" onclick="updateStatus('${p.patrol_ids.join(',')}', 'completed')" title="Complete"><i class="fas fa-check"></i></button>
                     ` : ''}
                     ${['scheduled','active'].includes(p.status) ? `
-                      <button class="btn-sm btn-danger" style="padding:4px 8px" onclick="updateStatus(${p.id},'cancelled')" title="Cancel"><i class="fas fa-ban"></i></button>
+                      <button class="btn-sm btn-danger" style="padding:4px 8px" onclick="updateStatus('${p.patrol_ids.join(',')}', 'cancelled')" title="Cancel"><i class="fas fa-ban"></i></button>
                     ` : ''}
                   </div>
                 </td>
@@ -67,25 +86,41 @@ async function loadActivePatrols() {
 
   try {
     const res = await API.patrols.getActive();
-    const patrols = res.data || [];
+    const rawPatrols = res.data || [];
 
-    if (!patrols.length) {
+    if (!rawPatrols.length) {
       wrap.innerHTML = '<div class="empty-state" style="padding:60px"><i class="fas fa-satellite-dish"></i><p>No active patrols right now</p></div>';
       return;
     }
 
+    // Group active patrols
+    const groupedMap = new Map();
+    rawPatrols.forEach(p => {
+      const key = `${p.start_time}_${p.end_time}`;
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, { ...p, team: [] });
+      }
+      groupedMap.get(key).team.push(p.officer_name.split(' ')[0]);
+    });
+    
+    const patrols = Array.from(groupedMap.values());
+
     wrap.innerHTML = `
       <div style="padding:12px 16px;background:var(--danger-dim);border-bottom:1px solid var(--border);font-size:12px;color:var(--danger);display:flex;align-items:center;gap:8px">
         <span class="pulse-dot" style="background:var(--danger)"></span>
-        LIVE — ${patrols.length} active patrol${patrols.length > 1 ? 's' : ''} in progress
+        LIVE — ${patrols.length} active patrol unit${patrols.length > 1 ? 's' : ''} in progress
       </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:16px">
         ${patrols.map(p => `
           <div style="background:var(--bg-secondary);border:1px solid var(--border);border-left:3px solid var(--success);border-radius:8px;padding:14px">
             <div style="display:flex;justify-content:space-between;margin-bottom:8px">
               <div>
-                <div style="font-size:14px;font-weight:500;color:var(--text-primary)">${p.officer_name}</div>
-                <div style="font-size:11px;color:var(--accent)">${p.designation} · ${p.badge_number}</div>
+                <div style="font-size:14px;font-weight:500;color:var(--text-primary)">
+                  ${p.team.length > 1 ? `Team (${p.team.length}): ${p.team.join(', ')}` : p.officer_name}
+                </div>
+                <div style="font-size:11px;color:var(--accent)">
+                  ${p.team.length > 1 ? 'Team Patrol' : `${p.designation} · ${p.badge_number}`}
+                </div>
               </div>
               <span class="status-badge status-active">ACTIVE</span>
             </div>
@@ -244,17 +279,51 @@ async function updateWaypoint(id, status) {
   }
 }
 
-async function updateStatus(id, status) {
-  const labels = { active: 'start', completed: 'complete', cancelled: 'cancel' };
-  if (!confirm(`${labels[status]?.charAt(0).toUpperCase() + labels[status]?.slice(1)} this patrol?`)) return;
+// Global variable to store the action waiting for confirmation
+let pendingAction = null;
+
+// The new updateStatus function that triggers the modal instead of native confirm
+function updateStatus(idsString, status) {
+  const labels = { active: 'Start', completed: 'Complete', cancelled: 'Cancel' };
+  const actionWord = labels[status] || 'Update';
+  
+  // Set modal text dynamically
+  document.getElementById('confirmTitle').textContent = `${actionWord} Patrol`;
+  document.getElementById('confirmMessage').textContent = `Are you sure you want to ${actionWord.toLowerCase()} this patrol?`;
+  
+  // Store the data so the confirm button knows what to do
+  pendingAction = { idsString, status };
+  
+  // Show the modal
+  document.getElementById('confirmModal').classList.add('active');
+}
+
+// Function to close the modal
+function closeConfirm() {
+  document.getElementById('confirmModal').classList.remove('active');
+  pendingAction = null;
+}
+
+// Event listener for the actual confirmation button inside the modal
+document.getElementById('confirmBtn').addEventListener('click', async () => {
+  if (!pendingAction) return;
+  
+  const { idsString, status } = pendingAction;
+  
+  // Close the modal immediately so the UI feels snappy
+  closeConfirm(); 
+
   try {
-    await API.patrols.updateStatus(id, { status });
-    showToast(`Patrol ${status}`, 'success');
+    // Execute the API calls for the team
+    const ids = String(idsString).split(',');
+    await Promise.all(ids.map(id => API.patrols.updateStatus(id, { status })));
+    
+    showToast(`Patrol marked as ${status}`, 'success');
     loadPatrols();
   } catch {
     showToast('Error updating patrol status', 'error');
   }
-}
+});
 
 async function openAssignModal() {
   try {
