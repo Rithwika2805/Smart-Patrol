@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    if (!localStorage.getItem('token')) {
+      window.location.href = 'login.html';
+    }
+  </script>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Patrol Routes — Patrol-AI</title>
@@ -25,6 +30,10 @@
       <a href="patrols.html" class="nav-item active"><i class="fas fa-route"></i><span>Patrol Routes</span></a>
       <a href="analytics.html" class="nav-item"><i class="fas fa-brain"></i><span>AI Analytics</span></a>
     </nav>
+    <div style="border-top: 1px solid var(--border); margin: 10px 0;"></div>
+      <a href="#" class="nav-item" onclick="logout()" style="color: var(--danger);">
+        <i class="fas fa-sign-out-alt"></i><span>Secure Logout</span>
+      </a>
     <div class="sidebar-footer"><div class="status-indicator"><span class="pulse-dot"></span><span>System Active</span></div></div>
   </aside>
 

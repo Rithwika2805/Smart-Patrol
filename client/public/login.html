@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Login — Patrol-AI</title>
+  
+  <!-- Use your existing stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Specific styles to center the login screen */
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: #eef2f6; /* Fallback for your app's background */
+      margin: 0;
+      background-image: radial-gradient(#d1dbe6 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .login-container {
+      background: var(--bg-primary, #ffffff);
+      padding: 40px;
+      border-radius: var(--radius, 12px);
+      box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 400px;
+      border: 1px solid var(--border, #e1e8ed);
+      text-align: center;
+    }
+    .login-logo {
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .login-logo .logo-icon {
+      font-size: 36px;
+      color: var(--accent, #00d4ff);
+      filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.4));
+    }
+    .login-logo .logo-text {
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+    }
+    .logo-main { color: var(--text-primary, #1e3045); }
+    .logo-ai { color: var(--accent, #00d4ff); }
+    
+    .form-group { text-align: left; margin-bottom: 20px; }
+    
+    .btn-login {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      margin-top: 10px;
+      justify-content: center;
+    }
+    
+    #errorMessage {
+      color: var(--danger, #ff4757);
+      background: var(--danger-dim, rgba(255,71,87,0.1));
+      border: 1px solid var(--danger, #ff4757);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 13px;
+      margin-top: 20px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-container">
+    <div class="login-logo">
+      <div class="logo-icon"><i class="fas fa-shield-halved"></i></div>
+      <div class="logo-text"><span class="logo-main">PATROL</span><span class="logo-ai">AI</span></div>
+    </div>
+    
+    <div style="margin-bottom: 30px; color: var(--text-muted); font-size: 14px;">
+      Authorized Personnel Only
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input type="text" class="form-control" id="username" placeholder="e.g., admin" autocomplete="username">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input type="password" class="form-control" id="password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <button class="btn-sm btn-primary btn-login" id="loginBtn" onclick="handleLogin()">
+      <i class="fas fa-right-to-bracket"></i> Secure Login
+    </button>
+
+    <div id="errorMessage"></div>
+  </div>
+
+  <script>
+    // Automatically focus the username field on page load
+    document.getElementById('username').focus();
+
+    async function handleLogin() {
+      const usernameInput = document.getElementById('username');
+      const passwordInput = document.getElementById('password');
+      const errorDiv = document.getElementById('errorMessage');
+      const btn = document.getElementById('loginBtn');
+      
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value;
+
+      if (!username || !password) {
+        showError('Please enter both username and password.');
+        return;
+      }
+
+      // Visual feedback while waiting for the server
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
+      btn.disabled = true;
+      errorDiv.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        
+        const data = await res.json();
+
+        if (data.success) {
+          // Save the JWT token securely in localStorage
+          localStorage.setItem('token', data.token);
+          
+          // Show a quick success state before redirecting
+          btn.innerHTML = '<i class="fas fa-check"></i> Access Granted';
+          btn.style.backgroundColor = 'var(--success)';
+          btn.style.borderColor = 'var(--success)';
+          
+          setTimeout(() => {
+            window.location.href = 'index.html'; 
+          }, 600);
+
+        } else {
+          // Display the error from the backend
+          showError(data.error || 'Invalid credentials');
+          resetButton();
+        }
+      } catch (err) {
+        showError('Server error. Is the backend running on port 3000?');
+        resetButton();
+      }
+    }
+
+    function showError(msg) {
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.innerHTML = `<i class="fas fa-triangle-exclamation"></i> ${msg}`;
+      errorDiv.style.display = 'block';
+    }
+
+    function resetButton() {
+      const btn = document.getElementById('loginBtn');
+      btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Secure Login';
+      btn.disabled = false;
+    }
+
+    // Allow pressing "Enter" anywhere to submit the form
+    document.addEventListener('keypress', function (e) {
+      if (e.key === 'Enter') {
+        handleLogin();
+      }
+    });
+  </script>
+</body>
+</html>

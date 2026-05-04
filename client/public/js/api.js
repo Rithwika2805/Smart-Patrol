@@ -1,37 +1,56 @@
 const API_BASE = 'http://localhost:5000/api';
 
+// Helper to get the JWT token
+const getToken = () => localStorage.getItem('token');
+
+// Core request handler with built-in JWT Authentication
+const request = async (endpoint, options = {}) => {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+
+  // If a token exists, attach it to the Authorization header
+  const token = getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
+    
+    // If unauthorized or forbidden, clear the bad token and kick to login
+    if (res.status === 401 || res.status === 403) {
+      localStorage.removeItem('token');
+      window.location.href = 'login.html';
+      throw new Error('Unauthorized');
+    }
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  } catch (error) {
+    console.error("API Error:", error);
+    throw error;
+  }
+};
+
 const API = {
-  async get(endpoint) {
-    const res = await fetch(`${API_BASE}${endpoint}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  },
-
-  async post(endpoint, data) {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  },
-
-  async put(endpoint, data) {
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  },
-
-  async delete(endpoint) {
-    const res = await fetch(`${API_BASE}${endpoint}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  },
+  // Use the new request handler for all methods
+  get: (endpoint) => request(endpoint),
+  
+  post: (endpoint, data) => request(endpoint, { 
+    method: 'POST', 
+    body: JSON.stringify(data) 
+  }),
+  
+  put: (endpoint, data) => request(endpoint, { 
+    method: 'PUT', 
+    body: JSON.stringify(data) 
+  }),
+  
+  delete: (endpoint) => request(endpoint, { 
+    method: 'DELETE' 
+  }),
 
   // Endpoints
   crimes: {
@@ -140,4 +159,18 @@ function timeAgo(dateStr) {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+// ── SECURE LOGOUT ──
+function logout() {
+  // Remove the JWT token from the browser
+  localStorage.removeItem('token');
+  
+  // Show a quick toast (optional, but looks nice)
+  showToast('Logging out...', 'info');
+  
+  // Redirect to the login page after a tiny delay
+  setTimeout(() => {
+    window.location.href = 'login.html';
+  }, 500);
 }
