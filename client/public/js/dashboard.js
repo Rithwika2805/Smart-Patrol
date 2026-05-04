@@ -197,10 +197,10 @@ async function loadPatrolSuggestions() {
 
   try {
     const res = await API.patrols.suggest();
-    const { suggestions, shift, available_officers, high_risk_zones } = res.data || {};
+    const { suggestions = [], shift, available_officers, high_risk_zones } = res.data || {};
     window.suggestionsData = suggestions;
 
-    if (!suggestions?.length) {
+    if (!suggestions.length) {
       el.innerHTML = '<div class="empty-state"><i class="fas fa-circle-check"></i><p>All active zones covered. No urgent suggestions.</p></div>';
       return;
     }
@@ -216,7 +216,11 @@ async function loadPatrolSuggestions() {
             <span style="font-size:10px;color:var(--text-muted)">${s.suggested_duration_hours}h patrol</span>
           </div>
           <div class="suggestion-officer" style="margin-bottom:6px;">
-            <i class="fas fa-users"></i> Team: ${s.team.map(o => o.name.split(' ')[0]).join(', ')} <span style="color:var(--text-muted);font-size:11px">(${s.team.length} Officers)</span>
+            <i class="fas fa-users"></i> Team: 
+            ${s.team.length > 0 
+              ? s.team.map(o => `${o.name.split(' ')[0]} <span style="font-size:9px;color:var(--accent);text-transform:uppercase">(${o.shift})</span>`).join(', ') + ` <span style="color:var(--text-muted);font-size:11px">(${s.team.length} Officers)</span>`
+              : `<span style="color:var(--danger);font-weight:700;">UNASSIGNED (No available officers)</span>`
+            }
           </div>
           <div class="suggestion-zone">
             <i class="fas fa-location-dot"></i> ${s.primary_zone.name} — Risk: ${s.primary_zone.risk_score}/100

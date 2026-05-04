@@ -42,3 +42,15 @@ exports.isOfficerAvailable = async (officerId, startTime, endTime) => {
   );
   return conflicts.length === 0;
 };
+
+// Get ALL available officers (for cross-shift emergencies)
+exports.getAllAvailableOfficers = async () => {
+  const [officers] = await db.query(
+    `SELECT o.*, s.name as station_name, s.lat as station_lat, s.lng as station_lng
+     FROM officers o 
+     LEFT JOIN stations s ON o.station_id = s.id
+     WHERE o.status = 'available'
+     ORDER BY o.designation DESC`
+  );
+  return officers;
+};

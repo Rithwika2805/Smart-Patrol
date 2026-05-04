@@ -8,60 +8,88 @@ exports.generateSmartSuggestions = async () => {
   const currentShift = currentHour >= 6 && currentHour < 14 ? 'morning'
     : currentHour >= 14 && currentHour < 22 ? 'evening' : 'night';
 
-  // 1. Fetch currently active/scheduled zones to prevent duplicate assignments
+  let availableOfficers = await officerService.getOfficersByShift(currentShift);
+  let crossShiftUsed = false;
+
+  if (availableOfficers.length === 0) {
+    availableOfficers = await officerService.getAllAvailableOfficers();
+    crossShiftUsed = true;
+  }
+
+  // 🌟 THE FIX 1: REMOVED the early exit! We no longer return [] if availableOfficers is 0.
+
   const [activePatrols] = await db.query(`
-    SELECT DISTINCT pw.area_id FROM patrol_waypoints pw
+    SELECT DISTINCT pw.area_id 
+    FROM patrol_waypoints pw
     JOIN patrols p ON p.id = pw.patrol_id
     WHERE p.status IN ('active', 'scheduled')
   `);
-  // Filter out nulls just in case
+  
   const activeZoneIds = new Set(activePatrols.map(p => p.area_id).filter(id => id != null));
 
-  // 2. Get high-risk hotspots (excluding already patrolled ones)
   const [allHotspots] = await db.query(`
     SELECT h.*, COUNT(c.id) as recent_crimes
     FROM hotspots h
     LEFT JOIN crimes c ON c.area_id = h.id AND c.occurred_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-    GROUP BY h.id HAVING recent_crimes > 0 OR h.risk_score > 50
+    GROUP BY h.id
     ORDER BY h.risk_score DESC, recent_crimes DESC
   `);
-  
-  const hotspots = allHotspots.filter(h => !activeZoneIds.has(h.id)).slice(0, 10);
 
-  // 3. Get available officers
-  const availableOfficers = await officerService.getOfficersByShift(currentShift);
+  let availableZones = allHotspots.filter(h => !activeZoneIds.has(h.id));
+  let hotspots = [];
+
+  // Mix 3 High/Medium risk zones with 2 Routine (Low risk) zones
+  if (crossShiftUsed) {
+    hotspots = availableZones.filter(h => h.risk_score > 80).slice(0, 10);
+  } else {
+    const riskyZones = availableZones.filter(h => h.risk_score >= 50).slice(0, 3);
+    const routineZones = availableZones.filter(h => h.risk_score < 50)
+                                       .sort((a, b) => a.risk_score - b.risk_score) 
+                                       .slice(0, 2); 
+    hotspots = [...riskyZones, ...routineZones];
+  }
+
+  if (hotspots.length === 0) {
+     return {
+      suggestions: [], shift: currentShift, generated_at: new Date(),
+      available_officers: availableOfficers.length, high_risk_zones: 0
+    };
+  }
+
   const workloadData = await officerService.getOfficerWorkload();
-
   const officersByWorkload = availableOfficers.map(o => ({
     ...o, recent_patrols: workloadData.find(w => w.id === o.id)?.recent_patrols || 0
   })).sort((a, b) => a.recent_patrols - b.recent_patrols);
 
   const suggestions = [];
   const usedOfficers = new Set();
-  // Ensure we have at least enough officers to form a team
-  const maxSuggestions = Math.min(Math.floor(availableOfficers.length / 2), hotspots.length, 5);
+  
+  // 🌟 THE FIX 2: Generate up to 5 routes regardless of how many officers we have
+  const maxSuggestions = Math.min(hotspots.length, 5);
 
   const formatDateTime = (d) => {
     const pad = (n) => n.toString().padStart(2, '0');
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   };
 
-  for (let i = 0; i < maxSuggestions; i++) {
-    const hotspot = hotspots[i];
+  let suggestionsCount = 0;
+
+  for (let hotspot of hotspots) {
+    if (suggestionsCount >= maxSuggestions) break;
+    if (activeZoneIds.has(hotspot.id)) continue;
+
     const priority = hotspot.risk_score >= 75 ? 'HIGH' : hotspot.risk_score >= 50 ? 'MEDIUM' : 'LOW';
-    
-    // Determine team size based on risk
     const targetTeamSize = priority === 'HIGH' ? 3 : 2;
     let team = [];
     let selectedStartTime = new Date();
     let selectedEndTime = new Date();
-    selectedEndTime.setHours(selectedEndTime.getHours() + (priority === 'HIGH' ? 4 : 3));
+    
+    const patrolDuration = priority === 'HIGH' ? 4 : (priority === 'MEDIUM' ? 3 : 2);
+    selectedEndTime.setHours(selectedEndTime.getHours() + patrolDuration);
 
-    // 🔍 Find a TEAM of available & unused officers
     for (let officer of officersByWorkload) {
       if (usedOfficers.has(officer.id)) continue;
       
-      // Use formatted strings to prevent Date object serialization crashes
       const isAvailable = await officerService.isOfficerAvailable(
         officer.id, 
         formatDateTime(selectedStartTime), 
@@ -71,17 +99,18 @@ exports.generateSmartSuggestions = async () => {
       if (isAvailable) {
         team.push({
           id: officer.id, name: officer.name, badge_number: officer.badge_number,
-          designation: officer.designation, recent_patrols: officer.recent_patrols
+          designation: officer.designation, recent_patrols: officer.recent_patrols,
+          shift: officer.shift 
         });
         usedOfficers.add(officer.id);
         if (team.length >= targetTeamSize) break;
       }
     }
 
-    if (team.length === 0) continue; // Skip if no officers available for this route
+    // 🌟 THE FIX 3: REMOVED `if (team.length === 0) continue;`
+    // We now allow the AI to build the rest of the route even if the team is empty!
 
-    // 📍 Get mixed zones (high + medium)
-    // Bulletproof NOT IN clause to avoid mysql2 array parameter bugs
+    activeZoneIds.add(hotspot.id);
     const activeIdsArr = Array.from(activeZoneIds);
     const notInClause = activeIdsArr.length > 0 ? `AND id NOT IN (${activeIdsArr.join(',')})` : '';
 
@@ -92,6 +121,8 @@ exports.generateSmartSuggestions = async () => {
     `, [hotspot.id]);
 
     let selectedZones = [...mixedZones.filter(z => z.risk_score < 75).slice(0, 1), ...mixedZones.filter(z => z.risk_score >= 75).slice(0, 2)].slice(0, 3);
+    selectedZones.forEach(z => activeZoneIds.add(z.id));
+
     const route = await routeService.generateOptimizedRoute([hotspot.id, ...selectedZones.map(z => z.id)]);
 
     suggestions.push({
@@ -101,10 +132,12 @@ exports.generateSmartSuggestions = async () => {
       suggested_end_time: selectedEndTime,
       additional_zones: selectedZones,
       optimized_route: route,
-      suggested_duration_hours: priority === 'HIGH' ? 4 : 3,
-      reason: buildReason(hotspot, currentHour),
+      suggested_duration_hours: patrolDuration,
+      reason: buildReason(hotspot, currentHour, crossShiftUsed, team.length === 0), // <-- Pass empty team flag
       shift: currentShift
     });
+
+    suggestionsCount++;
   }
 
   return {
@@ -114,30 +147,29 @@ exports.generateSmartSuggestions = async () => {
   };
 };
 
-function buildReason(hotspot, hour) {
+// 🌟 THE FIX 4: Update reasoning to handle unassigned routes
+function buildReason(hotspot, hour, crossShiftUsed, isUnassigned) {
   const reasons = [];
-  if (hotspot.risk_score >= 75) reasons.push(`High risk score (${hotspot.risk_score}/100)`);
-  if (hotspot.recent_crimes > 3) reasons.push(`${hotspot.recent_crimes} crimes in last 7 days`);
-  if (hour >= 20 || hour <= 6) reasons.push('Night hours — historically high crime period');
-  return reasons.join('; ') || 'Regular patrol coverage needed';
-}
+  
+  if (isUnassigned) reasons.push('🚨 NO OFFICERS AVAILABLE TO ASSIGN');
+  if (crossShiftUsed && !isUnassigned) reasons.push('⚠️ Cross-shift assignment due to staff shortage');
 
-function buildReason(hotspot, hour) {
-  const reasons = [];
+  if (hotspot.risk_score < 50) {
+    return reasons.length ? reasons.join('; ') : 'Routine daily visibility patrol';
+  }
+
   if (hotspot.risk_score >= 75) reasons.push(`High risk score (${hotspot.risk_score}/100)`);
   if (hotspot.recent_crimes > 3) reasons.push(`${hotspot.recent_crimes} crimes in last 7 days`);
   if (hour >= 20 || hour <= 6) reasons.push('Night hours — historically high crime period');
-  return reasons.join('; ') || 'Regular patrol coverage needed';
+  
+  return reasons.join('; ') || 'Standard patrol coverage needed';
 }
 
 function getTimeForHour(hour) {
   const d = new Date();
   d.setHours(hour, 0, 0, 0);
-
-  // If time already passed today → move to next day
   if (d < new Date()) {
     d.setDate(d.getDate() + 1);
   }
-
   return d;
 }
