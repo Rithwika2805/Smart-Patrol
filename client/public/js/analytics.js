@@ -169,6 +169,10 @@ async function loadZones() {
 
     // Default hour to current
     hourSel.value = new Date().getHours();
+
+    document.getElementById('predictZone').addEventListener('change', runPrediction);
+    document.getElementById('predictHour').addEventListener('change', runPrediction);
+    document.getElementById('predictDay').addEventListener('change', runPrediction);
   } catch (err) {
     console.error("Error loading zones/hours:", err);
   }

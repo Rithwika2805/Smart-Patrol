@@ -3,7 +3,8 @@ const db = require('../db');
 // GET all crimes with filters
 exports.getAllCrimes = async (req, res) => {
   try {
-    const { type, area, startDate, endDate, limit = 100 } = req.query;
+    const { type, status, area, startDate, endDate, limit = 100 } = req.query; 
+    
     let query = `SELECT c.*, h.risk_score, h.zone_name 
                  FROM crimes c 
                  LEFT JOIN hotspots h ON c.area_id = h.id 
@@ -11,6 +12,12 @@ exports.getAllCrimes = async (req, res) => {
     const params = [];
 
     if (type) { query += ` AND c.crime_type = ?`; params.push(type); }
+    
+    if (status) { 
+      query += ` AND c.status = ?`; 
+      params.push(status); 
+    }
+
     if (area) { query += ` AND c.area_id = ?`; params.push(area); }
     if (startDate) { query += ` AND c.occurred_at >= ?`; params.push(startDate); }
     if (endDate) { query += ` AND c.occurred_at <= ?`; params.push(endDate); }

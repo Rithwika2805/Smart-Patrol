@@ -1,3 +1,5 @@
+let patrolMapInstance = null;
+
 async function loadPatrols() {
   const wrap = document.getElementById('patrolsTableWrap');
   wrap.innerHTML = '<div class="loading-spinner"></div>';
@@ -142,11 +144,15 @@ async function viewPatrol(id) {
     const p = res.data;
     document.getElementById('patrolDetailModal').setAttribute('data-id', id);
     
-    const wps = p.waypoints || [];
+    const wps = p.waypoints || []; 
     const team = p.team || [{ name: p.officer_name, designation: p.designation, badge_number: p.badge_number }];
     
     let routeData = {};
-    try { routeData = typeof p.route_data === 'string' ? JSON.parse(p.route_data) : p.route_data; } catch(e) {}
+    try { 
+      routeData = typeof p.route_data === 'string' ? JSON.parse(p.route_data) : p.route_data; 
+    } catch(e) {
+      routeData = {};
+    }
 
     let teamHtml = `
       <div style="margin-bottom: 20px; background: var(--bg-primary); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
@@ -171,55 +177,12 @@ async function viewPatrol(id) {
       ${p.notes ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic;margin-bottom:20px;">${p.notes}</div>` : ''}
     `;
 
-    // Dynamic Topological Graph
-    let graphHtml = '';
-    if (wps.length > 0) {
-      let minLat = Math.min(...wps.map(w => w.lat));
-      let maxLat = Math.max(...wps.map(w => w.lat));
-      let minLng = Math.min(...wps.map(w => w.lng));
-      let maxLng = Math.max(...wps.map(w => w.lng));
-
-      let latRange = (maxLat - minLat) || 0.01;
-      let lngRange = (maxLng - minLng) || 0.01;
-
-      let pointsHtml = '';
-      let svgLines = '';
-      let prevX, prevY;
-
-      wps.forEach((w, i) => {
-        let x = ((w.lng - minLng) / lngRange) * 60 + 20; 
-        let y = 100 - (((w.lat - minLat) / latRange) * 60 + 20); 
-
-        if (i > 0) {
-          svgLines += `<line x1="${prevX}%" y1="${prevY}%" x2="${x}%" y2="${y}%" stroke="var(--accent)" stroke-width="3" stroke-dasharray="6,4" opacity="0.5" />`;
-        }
-
-        const nodeColor = w.status === 'reached' ? 'var(--success)' : 'var(--accent)';
-        const glowColor = w.status === 'reached' ? 'var(--success-dim)' : 'var(--accent-glow)';
-
-        pointsHtml += `
-          <div style="position:absolute; left:${x}%; top:${y}%; transform:translate(-50%, -50%); width:24px; height:24px; background:${nodeColor}; color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:bold; z-index:2; box-shadow:0 0 0 4px ${glowColor};" title="${w.zone_name || 'Zone'}">
-            ${i + 1}
-          </div>
-          <div style="position:absolute; left:${x}%; top:${y}%; transform:translate(-50%, 18px); font-size:10px; font-weight:500; white-space:nowrap; color:var(--text-secondary); background:var(--bg-secondary); padding:2px 6px; border-radius:4px; border: 1px solid var(--border); z-index:3; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-             ${w.zone_name || `Zone ${w.area_id}`}
-          </div>
-        `;
-        prevX = x; prevY = y;
-      });
-
-      graphHtml = `
-        <div style="margin-bottom: 20px;">
-          <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Topological Route Graph</h4>
-          <div style="position: relative; width: 100%; height: 240px; background: #eef2f6; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 20px 20px;">
-            <svg style="position: absolute; top:0; left:0; width:100%; height:100%; z-index:1; pointer-events:none;">
-              ${svgLines}
-            </svg>
-            ${pointsHtml}
-          </div>
-        </div>
-      `;
-    }
+    let mapHtml = `
+      <div style="margin-bottom: 20px;">
+        <h4 style="font-size: 13px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 10px; font-family: var(--font-display);">Interactive Route Map</h4>
+        <div id="patrolMap" style="width: 100%; height: 260px; border: 1px solid var(--border); border-radius: var(--radius); background: #eef2f6; z-index: 1;"></div>
+      </div>
+    `;
 
     let timelineHtml = `
       <div>
@@ -250,8 +213,51 @@ async function viewPatrol(id) {
       </div>
     `;
 
-    document.getElementById('patrolDetailBody').innerHTML = teamHtml + detailsHtml + graphHtml + timelineHtml;
-    document.getElementById('patrolDetailModal').classList.add('active');
+    document.getElementById('patrolDetailBody').innerHTML = teamHtml + detailsHtml + mapHtml + timelineHtml;
+    document.getElementById('patrolDetailModal').classList.add('active'); 
+
+    setTimeout(() => {
+      if (patrolMapInstance) {
+        patrolMapInstance.remove();
+      }
+
+      if (wps.length > 0) {
+        patrolMapInstance = L.map('patrolMap', { zoomControl: false }).setView([wps[0].lat, wps[0].lng], 14);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OSM'
+        }).addTo(patrolMapInstance);
+
+        const latLngs = wps.map(w => L.latLng(w.lat, w.lng));
+
+        L.Routing.control({
+          waypoints: latLngs,
+          router: L.Routing.osrmv1({
+            serviceUrl: 'https://router.project-osrm.org/route/v1'
+          }),
+          lineOptions: {
+            styles: [
+              { color: '#1e3799', weight: 8, opacity: 0.8 },
+              { color: '#00d4ff', weight: 4, opacity: 1, dashArray: '8, 6' }
+            ],
+            extendToWaypoints: true,
+            missingRouteTolerance: 0
+          },
+          show: false,
+          addWaypoints: false,
+          fitSelectedRoutes: true,
+          createMarker: function(i, wp, nWps) {
+             return L.marker(wp.latLng, {
+               icon: L.divIcon({
+                 html: `<div style="background:var(--accent);border:2px solid #fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:bold;box-shadow:0 0 10px var(--accent-glow)">${i + 1}</div>`,
+                 iconSize: [24, 24],
+                 iconAnchor: [12, 12]
+               })
+             });
+          }
+        }).addTo(patrolMapInstance);
+      }
+    }, 100);
   } catch (err) {
     showToast('Error loading patrol details', 'error');
   }
